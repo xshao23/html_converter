@@ -2,6 +2,8 @@ module MarkdownSyntax where
 
 import Control.Monad (liftM2)
 import Data.List 
+import Data.Foldable qualified as Foldable
+
 import qualified Data.Char as Char
 import Data.Char
 import qualified Data.Set as Set (fromList, member)
@@ -10,17 +12,21 @@ import Test.QuickCheck (Arbitrary (..), Gen)
 import Text.PrettyPrint (Doc, (<+>))
 import qualified Test.QuickCheck as QC
 
+newtype Markdown = Markdown [Component]
+  deriving (Eq, Show)
+
 -- See https://www.markdownguide.org/basic-syntax
 data Component
-    = Heading Header Block
-    | Paragraph Block
-    | Blockquote [Component]
-    | OrderedList [OrderedItem] 
-    | UnorderedList [UnorderedItem]
-    | CodeBlock String
-    | HorizontalRule 
-    | Plain String -- no open/close tags associated
-    deriving (Eq, Show)
+  = Heading Header Block
+  | Paragraph Block
+  | Blockquote [Component]
+  | OrderedList [Item]
+  | UnorderedList [Item]
+  | CodeBlock String
+  | HorizontalRule 
+  | Newline
+  | Plain String -- no open/close tags associated
+  deriving (Eq, Show)
 
 newtype Block = Block [Statement]
   deriving (Eq, Show)
@@ -31,11 +37,7 @@ instance Semigroup Block where
 instance Monoid Block where
   mempty = Block []
 
-newtype OrderedItem = OI [Component]
-  deriving (Eq, Show)
-  
-newtype UnorderedItem = UI [Component]
-  deriving (Eq, Show)
+type Item = [Component]
 
 data Statement
     = Bold Block 
@@ -57,13 +59,6 @@ data Header
     deriving (Eq, Show)
 
 -- TODO: Writing tests
-
-mHead :: Component 
-mHead = Heading H1 (Block [Literal "CIS 552"])
-
--- >>> mHead
--- Heading H1 (Block [Literal "CIS 552"])
--- | Generate a size-controlled statement
 
 genHeader :: Gen Header
 genHeader = getHeader <$> QC.choose(1, 6)
@@ -98,8 +93,8 @@ genComponent n =
       (n, Paragraph <$> genBlock n'),
       -- generate loops half as frequently as if statements
       (n, Blockquote <$> genCmpts n'),
-      (n, UnorderedList <$> genUIs n'),
-      (n, OrderedList <$> genOIs n')
+      (n, UnorderedList <$> genItems n'),
+      (n, OrderedList <$> genItems n')
     ]
   where
     n' = n `div` 2
@@ -129,13 +124,15 @@ genStatement n =
 genMaybe :: Gen (Maybe String)
 genMaybe = QC.oneof [return Nothing, Just <$> genStringLit]
 
-genUIs :: Int -> Gen [UnorderedItem]
-genUIs 0 = pure []
-genUIs n = (:) <$> (UI <$> genCmpts n) <*> genUIs (n `div` 2)
 
-genOIs :: Int -> Gen [OrderedItem]
-genOIs 0 = pure []
-genOIs n = (:) <$> (OI <$> genCmpts n) <*> genOIs (n `div` 2)
+genItem :: Int -> Gen Item 
+genItem 0 = pure [] 
+genItem n = (:) <$> genComponent n <*> genCmpts (n `div` 2)
+
+genItems :: Int -> Gen [Item]
+genItems 0 = pure [] 
+genItems n = (:) <$> genItem n <*> genItems (n `div` 2)
+
 
 genCmpts :: Int -> Gen [Component]
 genCmpts 0 = pure []
