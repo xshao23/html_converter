@@ -10,7 +10,7 @@ toHTML = undefined -- use insert here
 outputHTML :: HTML -> IO ()
 outputHTML = undefined
 
--- TODO: Add unit tests
+-- Some simple unit tests for converting markdown to html
 
 test1 :: Markdown
 test1 = Markdown [
@@ -31,6 +31,9 @@ expected1 = Html [
   "<ul><li>hello, world!</li><li>unordered<ol><li>first line</li><li>second line</li></ol></li></ul>"
   ]
 
+tTest1 :: Test 
+tTest1 = toHTML test1 ~?= expected1
+
 test2 :: Markdown 
 test2 = Markdown [
   Heading H1 (Block [Literal "H1 Heading"]),
@@ -49,8 +52,26 @@ expected2 = Html [
   "<p><em>Italicized test</em><strong>Love is bold</strong><em><strong>Bold and Italic</strong></em></p>"
   ]
 
+tTest2 :: Test 
+tTest2 = toHTML test2 ~?= expected2
+
 tHeadTest :: Test
 tHeadTest = "heading test" ~: TestList [
   toHTML test1 ~?= expected1,
   toHTML test2 ~?= expected2
  ]
+
+test3 :: Markdown 
+test3 = Markdown [
+  Heading H5 (Block [Literal "H5 Heading"]),
+  CodeBlock "getDate()"
+  ]
+
+expected3 :: HTML 
+expected3 = Html [
+  "<h5>H5 Heading</h5>",
+  "<code>getDate()</code>"
+  ]
+
+tTest3 :: Test 
+tTest3 = toHTML test3 ~?= expected3

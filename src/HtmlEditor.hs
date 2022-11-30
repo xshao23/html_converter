@@ -2,6 +2,7 @@ module HtmlEditor where
 
 import Data.Foldable qualified as Foldable
 import Data.List qualified as List
+import Test.HUnit (Test(..), (~?=), (~:), runTestTT)
 
 import MarkdownSyntax
 
@@ -19,8 +20,146 @@ empty = E
 insert :: CompStr -> HTML -> HTML
 insert = undefined
 
-convert :: Component -> CompStr 
-convert = undefined
+convComp :: Component -> [CompStr] 
+convComp = undefined
+
+convStmt :: Statement -> CompStr 
+convStmt = undefined
+
+-- Unit test cases
+
+tTestBold :: Test
+tTestBold = 
+  convStmt (Bold (Block [Literal "Love is bold"])) ~?= 
+    "<strong>Love is bold</strong>"
+
+tTestItalic :: Test 
+tTestItalic = 
+  convStmt (Italic (Block [Literal "This is italic text"])) ~?= 
+    "<em>This is italic text</em>"
+
+tTestBacktick :: Test 
+tTestBacktick = 
+  convStmt (Backtick "thisIsCode()") ~?= 
+    "<code>thisIsCode()</code>"
+
+tTestLink :: Test
+tTestLink = 
+  convStmt (
+    Link (Block [Literal "CIS 552"]) 
+    "https://www.seas.upenn.edu/~cis5520/22fa" 
+    Nothing
+    ) ~?= 
+      "<a href='https://www.seas.upenn.edu/~cis5520/22fa'>CIS 552</a>"
+
+tTestImage :: Test
+tTestImage = 
+  convStmt (
+    Image "Upenn" "image.jpg" (Just "image title")
+    ) ~?= 
+      "<a><img title='image title' alt='Upenn' src='image.jpg'></a>"
+
+tTestLineBreak :: Test 
+tTestLineBreak = convStmt LineBreak ~?= "<br>"
+
+tTestLiteral = 
+  convStmt (Literal "This is just a plain text") ~?= 
+    "This is just a plain text"
+
+tTestHeading :: Test
+tTestHeading = 
+  convComp (
+    Heading H1 (Block [Literal "H1 Heading", LineBreak, Literal "Continues"])
+    ) ~?= ["<h1>", "H1 Heading", "<br>", "Continues", "</h1>"]
+
+tTestParagraph :: Test
+tTestParagraph = 
+  convComp (
+    Paragraph (Block [
+      Bold (Block [Literal "Hello "]), Italic (Block [Literal "World"])
+      ])
+    ) ~?= [
+      "<p>", 
+        "<strong>", "Hello ", "</strong>", 
+        "<em>", "World", "</em>", 
+      "</p>"
+    ]
+
+tTestBlockquote :: Test
+tTestBlockquote = convComp (
+  Blockquote [
+    Plain "I love CIS552", 
+    Newline, 
+    Plain "It's best course!"
+    ]) ~?= 
+    ["<blockquote>", 
+        "I love CIS552", 
+        "<br>", 
+        "It's the best course!", 
+      "</blockquote>"
+      ]
+
+testOrderedList :: Component 
+testOrderedList = OrderedList [
+  [Plain "first line"], 
+  [Plain "methods: ", UnorderedList [
+      [CodeBlock "getDate()"],
+      [CodeBlock "getTime()"],
+      [CodeBlock "getMinutes()"]
+      ]
+    ]
+  ]
+
+expectedOrderedList :: [CompStr]
+expectedOrderedList = [
+  "<ol>", 
+    "<li>", "first line", "</li>",
+    "<li>", "methods: ",
+      "<ul>", 
+        "<li>", "<code>", "getDate()", "</code>", "</li>",
+        "<li>", "<code>", "getTime()", "</code>", "</li>",
+        "<li>", "<code>", "getMinutes()", "</code>", "</li>",
+      "</ul>",
+    "</li>",
+  "</ol>"
+  ]
+
+tTestOrderedList :: Test 
+tTestOrderedList = convComp testOrderedList ~?= expectedOrderedList
+
+testUnorderedList :: Component 
+testUnorderedList = UnorderedList [
+  [
+    Heading H4 (Block [Literal "H4 Heading"]), 
+    Paragraph (Block [Literal "I love Haskell"])
+  ],
+  [
+    Heading H5 (Block [Literal "H5 Heading"]), 
+    Paragraph (Block [Literal "and FP in general"])
+  ] 
+  ]
+
+expectedUnorderedList :: [CompStr]
+expectedUnorderedList = [
+  "<ul>",
+    "<li>", "<h4>", "H4 Heading", "</h4>", "<p>", "I love Haskell", "</p>", "</li>",
+    "<li>", "<h5>", "H5 Heading", "</h5>", "<p>", "and FP in general", "</p>", "</li>",
+  "</ul>"
+  ]
+
+tTestUnorderedList :: Test 
+tTestUnorderedList = convComp testUnorderedList ~?= expectedUnorderedList
+
+tTestCodeBlock :: Test
+tTestCodeBlock = 
+  convComp (CodeBlock "a + b = c") ~?= ["<code>", "a + b = c", "</code>"]
+
+tTestHorinzontalRule :: Test
+tTestHorinzontalRule = convComp HorizontalRule ~?= ["<hr>"]
+
+tTestPlain :: Test
+tTestPlain = 
+  convComp (Plain "This is just a plain text") ~?= ["This is just a plain text"]
 
 -- | Delete all matched component found 
 delete :: CompStr -> HTML -> HTML
@@ -32,6 +171,8 @@ member = undefined
 elements :: HTML -> [CompStr]
 elements (Html cs) = cs
 elements _ = []
+
+-- Below is some properties we would like to check for our html editor
 
 -- Post-Condiiton Property
 prop_FindPostPresent :: CompStr -> HTML -> Bool 
@@ -77,3 +218,4 @@ prop_InsertModel k h =
 prop_DeleteModel :: CompStr -> HTML -> Bool 
 prop_DeleteModel k h = 
   elements (delete k h) == List.delete k (elements h)
+

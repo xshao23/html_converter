@@ -58,7 +58,7 @@ data Header
     | H6 
     deriving (Eq, Show)
 
--- TODO: Writing tests
+-- Below is the generators that will be later used for property check
 
 genHeader :: Gen Header
 genHeader = getHeader <$> QC.choose(1, 6)
@@ -123,7 +123,6 @@ genStatement n =
 
 genMaybe :: Gen (Maybe String)
 genMaybe = QC.oneof [return Nothing, Just <$> genStringLit]
-
 
 genItem :: Int -> Gen Item 
 genItem 0 = pure [] 
