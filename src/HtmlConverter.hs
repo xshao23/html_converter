@@ -35,17 +35,17 @@ test1 = Markdown [
 
 expected1 :: HTMLFile String 
 expected1 = Root [
-  Element "h1" [PCDATA "Test Example 1"],
-  Element "hr" [],
-  Element "ul" [
-    Element "li" [
+  Element "h1" [] [PCDATA "Test Example 1"],
+  Element "hr" [] [],
+  Element "ul" [] [
+    Element "li" [] [
       PCDATA "hello, world!"
       ],
-    Element "li" [
+    Element "li" [] [
       PCDATA "unordered",
-      Element "ol" [
-        Element "li" [PCDATA "first line"],
-        Element "li" [PCDATA "second line"]
+      Element "ol" [] [
+        Element "li" [] [PCDATA "first line"],
+        Element "li" [] [PCDATA "second line"]
         ]
       ]  
   ]
@@ -72,12 +72,12 @@ test2 = Markdown [
 expected2 :: HTMLFile String
 expected2 = 
   Root [
-    Element "h1" [PCDATA "H1 Heading"],
-    Element "h3" [PCDATA "H3 Heading"],
-    Element "p" [
-      Element "em" [PCDATA "Italicized test"],
-      Element "strong" [PCDATA "Love is bold"],
-      Element "em" [Element "strong" [PCDATA "Bold and Italic"]]
+    Element "h1" [] [PCDATA "H1 Heading"],
+    Element "h3" [] [PCDATA "H3 Heading"],
+    Element "p" [] [
+      Element "em" [] [PCDATA "Italicized test"],
+      Element "strong" [] [PCDATA "Love is bold"],
+      Element "em" [] [Element "strong" [] [PCDATA "Bold and Italic"]]
     ]
   ]
   -- -- Html [
@@ -104,7 +104,7 @@ test3 = Markdown [
   ]
 
 expected3 :: HTMLFile String
-expected3 = Root [Element "h5" [PCDATA  "H5 Heading"], Element "code" [PCDATA "getDate()"]]
+expected3 = Root [Element "h5" [] [PCDATA  "H5 Heading"], Element "code" [] [PCDATA "getDate()"]]
 
 tTest3 :: Test 
 tTest3 = toHTML test3 ~?= expected3

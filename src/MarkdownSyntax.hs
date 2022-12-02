@@ -22,6 +22,7 @@ data Component
   | Blockquote [Component]
   | OrderedList [Item]
   | UnorderedList [Item]
+  | TaskList [TaskItem] 
   | CodeBlock String
   | HorizontalRule 
   | Newline
@@ -39,12 +40,17 @@ instance Monoid Block where
 
 type Item = [Component]
 
+newtype TaskItem = Bool [Component]
+  deriving (Eq, Show)
+
 data Statement
     = Bold Block 
     | Italic Block 
+    | Strikethrough Block
     | Backtick String 
+    | Emoji String
     | Link Block String (Maybe String) -- optional title  
-    | Image String String (Maybe String) -- optional title
+    | Image String String (Maybe String) -- alt src optional title
     | LineBreak -- <br>
     | Literal String
     deriving (Eq, Show)

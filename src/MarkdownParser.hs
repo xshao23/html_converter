@@ -63,6 +63,10 @@ statementP = undefined
 itemP :: Parser Item
 itemP = undefined 
 
+taskItemP :: Parser TaskItem
+taskItemP = undefined
+
+
 headerP :: Parser Header
 headerP = undefined
 
@@ -114,3 +118,9 @@ linebreakP = undefined
 
 literalP :: Parser Statement
 literalP = undefined
+
+emojiP :: Parser Statement
+emojiP = undefined
+
+strikethroughP :: Parser Statement
+strikethroughP = undefined
