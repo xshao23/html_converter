@@ -16,12 +16,16 @@ tStmtTest :: Test
 tStmtTest = "Statement test" ~: TestList [ 
   tTestBold,
   tTestItalic,
+  tTestBoldItalic,
   tTestBacktick,
   tTestLink,
   tTestImage,
   tTestLineBreak,
   tTestLiteral
   ]
+
+-- >>> runTestTT tStmtTest 
+-- Counts {cases = 8, tried = 8, errors = 0, failures = 0}
 
 tCompTest :: Test 
 tCompTest = "Component test" ~: TestList [
@@ -30,10 +34,13 @@ tCompTest = "Component test" ~: TestList [
   tTestBlockquote,
   tTestOrderedList,
   tTestUnorderedList,
+  tTestTaskList,
   tTestCodeBlock,
   tTestHorinzontalRule,
   tTestPlain
   ]
+-- >>> runTestTT tCompTest
+-- Counts {cases = 9, tried = 9, errors = 0, failures = 0}
 
 tMarkdownTest :: Test 
 tMarkdownTest = "Markdown test" ~: TestList [
@@ -41,3 +48,5 @@ tMarkdownTest = "Markdown test" ~: TestList [
   tTest2, 
   tTest3
   ]
+-- >>> runTestTT tMarkdownTest
+

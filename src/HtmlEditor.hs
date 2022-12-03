@@ -19,39 +19,92 @@ html2string :: SimpleHTML String -> String
 html2string html = go html "" where
   go :: SimpleHTML String -> String -> String
   go (PCDATA s) = (s ++)
-  go (Element tag _ []) = (("<" ++ tag ++ "/>") ++ )
+  go (Element tag attri []) = (("<" ++ tag ++ readAttris attri ++ "/>") ++ )
   -- TODO: Image does not have a closing tag
   go (Element tag attri body) = \s ->
-      "<" ++ tag ++ readAttri attri ++ ">" ++ 
+      "<" ++ tag ++ readAttris attri ++ ">" ++ 
         appEndo (foldMap (Endo . go) body) ("</" ++ tag ++ ">" ++ s)
 
-readAttri :: [(String, String)] -> String 
-readAttri = Prelude.foldr (\(k, v) acc -> k ++ "=\"" ++ v++ "\" " ++ acc) ""
+readAttris :: [(String, String)] -> String 
+readAttris = Prelude.foldr (\(k, v) acc -> k ++ "=\"" ++ v++ "\" " ++ acc) ""
 
 t :: [(String, String)]
 t = [("src", "http://"), ("title", "Upenn"), ("alt", "Flowers in Chania")]
 
--- >>> readAttri t
+boldAndItalic = convStmt $ Bold (Block [
+    Literal "Love is bold", 
+    Italic (Block [Literal " and italic"])
+  ])
+
+-- >>> html2string boldAndItalic 
+-- "<strong>Love is bold<em> and italic</em></strong>"
+
+-- >>> readAttris t
 -- "src=\"http://\" title=\"Upenn\" alt=\"Flowers in Chania\" "
-
-title :: Maybe String -> String 
-title Nothing = "" 
-title (Just s) = " title=" ++ s
-
 
 empty :: SimpleHTML String
 empty = PCDATA ""
 
 -- insert (Heading H1 (Block [Literal "CIS 552"])) E -> Heading H1 (Block [Literal "CIS 552"])
-htmlInsert :: SimpleHTML String -> SimpleHTML String -> SimpleHTML String
+htmlInsert :: SimpleHTML String -> [SimpleHTML String] -> [SimpleHTML String]
 htmlInsert = undefined
 
 convComp :: Component -> SimpleHTML String
-convComp = undefined
+convComp (Heading h b) = Element (show h) [] (convBlock b)
+convComp (Paragraph b) = Element "p" [] (convBlock b) 
+convComp (Blockquote cs) = Element "blockquote" [] (map convComp cs)
+convComp (OrderedList ol) = Element "ol" [] (map convItem ol)
+convComp (UnorderedList ul) = Element "ul" [] (map convItem ul)
+convComp (TaskList ti) = Element "ul" [] (map convTaskItem ti)
+convComp (CodeBlock s) = Element "code" [] [PCDATA s]
+convComp HorizontalRule = Element "hr" [] [] 
+convComp Newline = Element "br" [] []
+convComp (Plain s) = convStmt s
+
+convItem :: Item -> SimpleHTML String 
+convItem item = Element "li" [] (map convComp item) 
+
+convTaskItem :: TaskItem -> SimpleHTML String 
+convTaskItem (TI True item) = Element "li" (addAttris [("class", Just "checked")]) (map convComp item) 
+convTaskItem (TI False item) = convItem item
+
+{-
+  = Heading Header Block -- <h1><
+  | Paragraph Block -- <p>
+  | Blockquote [Component] -- <blockquote>
+  | OrderedList [Item] -- <ol>
+  | UnorderedList [Item] -- <ul>
+  | TaskList [TaskItem] -- <ul class="checked">
+  | CodeBlock String -- <code>
+  | HorizontalRule -- <hr/>
+  | Newline -- <br/>
+  | Plain Block -- no open/close tags associated
+  deriving (Eq, Show)
+-}
 
 convStmt :: Statement -> SimpleHTML String
-convStmt = undefined
+convStmt (Literal s) = PCDATA s  
+convStmt LineBreak = Element "br" [] []
+convStmt (Emoji s) = PCDATA ("&#" ++ s ++ ";") 
+convStmt (Backtick s) = Element "code" [] [PCDATA s] 
+convStmt (Image alt src title) = Element "img" (
+  addAttris [("alt", Just alt), ("src", Just src), ("title", title)]
+  ) []
+convStmt (Bold b) = Element "strong" [] (convBlock b)
+convStmt (Italic b) = Element "em" [] (convBlock b)
+convStmt (Strikethrough b) = Element "s" [] (convBlock b)
+convStmt (Link b href title) = Element "a" (
+  addAttris [("href", Just href), ("title", title)]
+  ) (convBlock b)
 
+convBlock :: Block -> [SimpleHTML String]
+convBlock (Block ss) = map convStmt ss
+
+addAttris :: [(String, Maybe String)] -> [(String, String)]
+addAttris = foldr (\(k, v) acc -> addAttri k v acc) []
+  where 
+    addAttri k Nothing xs = xs 
+    addAttri k (Just v) xs = (k, v) : xs
 
 -- Unit test cases
 tTestBold :: Test
@@ -63,6 +116,16 @@ tTestItalic :: Test
 tTestItalic = 
   convStmt (Italic (Block [Literal "This is italic text"])) ~?= 
     Element "em" [] [PCDATA "This is italic text"]
+
+tTestBoldItalic :: Test 
+tTestBoldItalic = 
+  convStmt (Bold (Block [
+    Literal "Love is bold", 
+    Italic (Block [Literal " and italic"])
+  ])) ~?= Element "strong" [] [
+    PCDATA "Love is bold", 
+    Element "em" [] [PCDATA " and italic"]
+  ]
 
 tTestBacktick :: Test 
 tTestBacktick = 
@@ -94,6 +157,7 @@ tTestLiteral =
   convStmt (Literal "This is just a plain text") ~?= 
     PCDATA "This is just a plain text"
 
+-- | Unit tests for converting components
 tTestHeading :: Test
 tTestHeading = 
   convComp (
@@ -123,9 +187,9 @@ tTestParagraph =
 tTestBlockquote :: Test
 tTestBlockquote = convComp (
   Blockquote [
-    Plain "I love CIS552", 
+    Plain (Literal "I love CIS552"), 
     Newline, 
-    Plain "It's best course!"
+    Plain (Literal "It's the best course!")
     ]) ~?= Element "blockquote" [] [
       PCDATA "I love CIS552", 
       Element "br" [] [], 
@@ -142,8 +206,8 @@ tTestBlockquote = convComp (
 
 testOrderedList :: Component 
 testOrderedList = OrderedList [
-  [Plain "first line"], 
-  [Plain "methods: ", UnorderedList [
+  [Plain (Literal "first line")], 
+  [Plain (Literal "methods: "), UnorderedList [
       [CodeBlock "getDate()"],
       [CodeBlock "getTime()"],
       [CodeBlock "getMinutes()"]
@@ -212,6 +276,25 @@ expectedUnorderedList = Element "ul" [] [
 tTestUnorderedList :: Test 
 tTestUnorderedList = convComp testUnorderedList ~?= expectedUnorderedList
 
+-- >>> runTestTT tTestPlain
+-- Counts {cases = 1, tried = 1, errors = 0, failures = 0}
+testTaskList :: Component 
+testTaskList = TaskList [
+  TI True [Plain (Literal "Pay bills")],
+  TI False [Plain (Literal "Submit assignment")],
+  TI True [Plain (Bold (Block [Literal "Exercise"]))]
+  ]
+
+expectedTaskList :: SimpleHTML String
+expectedTaskList = Element "ul" [] [
+  Element "li" [("class", "checked")] [PCDATA "Pay bills"],
+  Element "li" [] [PCDATA "Submit assignment"],
+  Element "li" [("class", "checked")] [Element "strong" [] [PCDATA "Exercise"]]
+  ]
+
+tTestTaskList :: Test 
+tTestTaskList = convComp testTaskList ~?= expectedTaskList
+
 tTestCodeBlock :: Test
 tTestCodeBlock = 
   convComp (CodeBlock "a + b = c") ~?= 
@@ -222,7 +305,7 @@ tTestHorinzontalRule = convComp HorizontalRule ~?= Element "hr" [] [] --["<hr>"]
 
 tTestPlain :: Test
 tTestPlain = 
-  convComp (Plain "This is just a plain text") ~?= 
+  convComp (Plain (Literal "This is just a plain text")) ~?= 
     PCDATA "This is just a plain text"
 
 -- | Delete all matched component found 
@@ -240,9 +323,9 @@ elements = Foldable.toList
 
 
 -- Below is some properties we would like to check for our html editor
-
+{-
 -- Post-Condiiton Property
-prop_FindPostPresent :: SimpleHTML String -> SimpleHTML String-> Bool 
+prop_FindPostPresent :: SimpleHTML String -> [SimpleHTML String] -> Bool 
 prop_FindPostPresent k h = isMember k (htmlInsert k h)
 
 prop_FindPostAbsent :: SimpleHTML String -> SimpleHTML String -> Bool 
@@ -281,3 +364,4 @@ prop_DeleteDelete x y h =
 prop_InsertModel :: SimpleHTML String -> SimpleHTML String -> Bool 
 prop_InsertModel k h = 
   elements (htmlInsert k h) == elements h ++ elements k
+-}

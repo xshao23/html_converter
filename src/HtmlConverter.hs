@@ -28,8 +28,13 @@ test1 = Markdown [
   HorizontalRule, 
   Newline,
   UnorderedList [
-    [Plain "hello, world!"], 
-    [Plain "unordered", OrderedList [[Plain "first line"], [Plain "second line"]]]
+    [Plain (Literal "hello, world!")], 
+    [
+      Plain (Literal "unordered"), 
+      OrderedList [
+        [Plain (Literal "first line")], 
+        [Plain (Literal "second line")]
+      ]]
     ]
   ]
 
@@ -85,8 +90,6 @@ expected2 =
   -- "<h3>H3 Heading</h3>",
   -- "<p><em>Italicized test</em><strong>Love is bold</strong><em><strong>Bold and Italic</strong></em></p>"
   -- ]
-
-
 
 tTest2 :: Test 
 tTest2 = toHTML test2 ~?= expected2

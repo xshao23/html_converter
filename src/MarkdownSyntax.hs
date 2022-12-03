@@ -2,8 +2,6 @@ module MarkdownSyntax where
 
 import Control.Monad (liftM2)
 import Data.List 
-import Data.Foldable qualified as Foldable
-
 import qualified Data.Char as Char
 import Data.Char
 import qualified Data.Set as Set (fromList, member)
@@ -17,16 +15,16 @@ newtype Markdown = Markdown [Component]
 
 -- See https://www.markdownguide.org/basic-syntax
 data Component
-  = Heading Header Block
-  | Paragraph Block
-  | Blockquote [Component]
-  | OrderedList [Item]
-  | UnorderedList [Item]
-  | TaskList [TaskItem] 
-  | CodeBlock String
-  | HorizontalRule 
-  | Newline
-  | Plain String -- no open/close tags associated
+  = Heading Header Block -- <h1>
+  | Paragraph Block -- <p>
+  | Blockquote [Component] -- <blockquote>
+  | OrderedList [Item] -- <ol>
+  | UnorderedList [Item] -- <ul>
+  | TaskList [TaskItem] -- <ul class="checked">
+  | CodeBlock String -- <code>
+  | HorizontalRule -- <hr/>
+  | Newline -- <br/>
+  | Plain Statement -- no open/close tags associated
   deriving (Eq, Show)
 
 newtype Block = Block [Statement]
@@ -40,7 +38,7 @@ instance Monoid Block where
 
 type Item = [Component]
 
-newtype TaskItem = Bool [Component]
+data TaskItem = TI Bool [Component]
   deriving (Eq, Show)
 
 data Statement
@@ -62,7 +60,16 @@ data Header
     | H4 
     | H5 
     | H6 
-    deriving (Eq, Show)
+    deriving (Eq)
+
+instance Show Header where 
+  show :: Header -> String
+  show H1 = "h1"
+  show H2 = "h2"
+  show H3 = "h3"
+  show H4 = "h4"
+  show H5 = "h5"
+  show H6 = "h6"
 
 -- Below is the generators that will be later used for property check
 
@@ -90,17 +97,24 @@ genStringLit = escape <$> QC.listOf (QC.elements stringLitChars)
     
 
 genComponent :: Int -> Gen Component
-genComponent n | n <= 1 = QC.oneof [Plain <$> genStringLit, return HorizontalRule]
+genComponent n | n <= 1 = QC.oneof [
+  return Newline, 
+  return HorizontalRule, 
+  CodeBlock <$> genStringLit
+  ]
 genComponent n =
   QC.frequency
-    [ (1, Plain <$> genStringLit),
+    [ (1, return Newline),
       (1, return HorizontalRule),
+      (1, CodeBlock <$> genStringLit),
+      -- generate loops half as frequently as if statements
       (n, Heading <$> genHeader <*> genBlock n'),
       (n, Paragraph <$> genBlock n'),
-      -- generate loops half as frequently as if statements
       (n, Blockquote <$> genCmpts n'),
       (n, UnorderedList <$> genItems n'),
-      (n, OrderedList <$> genItems n')
+      (n, OrderedList <$> genItems n'),
+      (n, TaskList <$> genTaskItems n'),
+      (n, Plain <$> genStatement n')
     ]
   where
     n' = n `div` 2
@@ -118,14 +132,20 @@ genStatement n =
   QC.frequency [
     (1, Literal <$> genStringLit),
     (1, Backtick <$> genStringLit),
+    (1, Emoji <$> genStringLit),
     (1, Image <$> genStringLit <*> genStringLit <*> genMaybe),
     (1, return LineBreak),
     (n, Bold <$> genBlock n'),
     (n, Italic <$> genBlock n'),
+    (n, Strikethrough <$> genBlock n'),
     (n, Link <$> genBlock n' <*> genStringLit <*> genMaybe)
     ]
   where
     n' = n `div` 2
+
+-- | Some helper generators below
+genBool :: Gen Bool
+genBool = QC.oneof [return False, return True]
 
 genMaybe :: Gen (Maybe String)
 genMaybe = QC.oneof [return Nothing, Just <$> genStringLit]
@@ -138,6 +158,12 @@ genItems :: Int -> Gen [Item]
 genItems 0 = pure [] 
 genItems n = (:) <$> genItem n <*> genItems (n `div` 2)
 
+genTaskItem :: Int -> Gen TaskItem 
+genTaskItem 0 = pure (TI False [])
+genTaskItem n = TI <$> genBool <*> genItem n
+
+genTaskItems :: Int -> Gen [TaskItem]
+genTaskItems n = (:) <$> genTaskItem n <*> genTaskItems (n `div` 2)
 
 genCmpts :: Int -> Gen [Component]
 genCmpts 0 = pure []
@@ -165,18 +191,17 @@ genBlock n = Block <$> genStmts n
 instance Arbitrary Component where
   arbitrary = QC.sized genComponent
 
-
 instance Arbitrary Statement where 
   arbitrary = QC.sized genStatement
 
 instance Arbitrary Block where
   arbitrary = QC.sized genBlock 
-  
-sampleBlock :: IO ()
-sampleBlock = QC.sample' (arbitrary :: Gen Block) >>= mapM_ print 
 
 sampleStatement :: IO ()
 sampleStatement = QC.sample' (arbitrary :: Gen Statement) >>= mapM_ print 
+
+sampleBlock :: IO ()
+sampleBlock = QC.sample' (arbitrary :: Gen Block) >>= mapM_ print 
 
 sampleComponent :: IO ()
 sampleComponent = QC.sample' (arbitrary :: Gen Component) >>= mapM_ print 

@@ -23,9 +23,9 @@ test_componentP =
   TestList
     [ P.parse headingP "# H1 Heading"  ~?= Right (Heading H1 (Block [Literal "H1 Heading"])),
       P.parse paragraphP "Hello world."  ~?= Right (Paragraph (Block [Literal "Hello world."])),
-      P.parse blockquoteP ">I love CIS552>\n>It's the best course!"  ~?= Right (Blockquote [Plain "I love CIS552", Newline, Plain "It's the best course!"]),
-      P.parse orderedListP "1. first line\n 2.second line" ~?= Right (OrderedList [[Plain "first line"], [Plain "second line"]]),
-      P.parse unorderedListP "- first line\n - second line" ~?= Right (UnorderedList [[Plain "first line"], [Plain "second line"]]),
+      P.parse blockquoteP ">I love CIS552>\n>It's the best course!"  ~?= Right (Blockquote [Plain (Literal "I love CIS552"), Newline, Plain (Literal "It's the best course!")]),
+      P.parse orderedListP "1. first line\n 2.second line" ~?= Right (OrderedList [[Plain (Literal "first line")], [Plain (Literal "second line")]]),
+      P.parse unorderedListP "- first line\n - second line" ~?= Right (UnorderedList [[Plain (Literal "first line")], [Plain (Literal "second line")]]),
       P.parse codeBlockP "`getDate()`" ~?= Right (CodeBlock "getDate()") 
     ]
 
