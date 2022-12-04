@@ -1,11 +1,20 @@
 {-# LANGUAGE DeriveFoldable #-}
 module HtmlConverter where 
 
-
+import Data.Maybe as Maybe
 import Data.Semigroup ( Endo(Endo, appEndo) )
 import Test.HUnit (Test(..), (~?=), (~:), runTestTT)
+import Test.QuickCheck
+  ( Arbitrary (..),
+    Gen,
+    Property,
+    Testable (..),
+    (==>),
+  )
 
+import qualified Data.Char as Char
 import qualified Data.Foldable as Foldable
+import qualified Test.QuickCheck as QC
 
 import MarkdownSyntax
 
@@ -39,10 +48,10 @@ boldAndItalic = convStmt $ Bold (Block [
 -- >>> html2string boldAndItalic 
 -- "<strong>Love is bold<em> and italic</em></strong>"
 
--- >>> html2string (convComp testOrderedList)
+-- >>> html2string (convCmpt testOrderedList)
 -- "<ol><li>first line</li><li>methods: <ul><li><code>getDate()</code></li><li><code>getTime()</code></li><li><code>getMinutes()</code></li></ul></li></ol>"
 
--- >>> html2string (convComp testTaskList)
+-- >>> html2string (convCmpt testTaskList)
 -- "<ul><li class=\"checked\">Pay bills</li><li>Submit assignment</li><li class=\"checked\"><strong>Exercise</strong></li></ul>"
 
 
@@ -51,29 +60,29 @@ boldAndItalic = convStmt $ Bold (Block [
 
 -- Part 1 : Convert the given Markdown file to an HTML file
 convert :: Markdown -> SimpleHTML String 
-convert (Markdown cs) = render (map convComp cs)
+convert (Markdown cs) = render (map convCmpt cs)
 
 render :: [SimpleHTML String] -> SimpleHTML String 
 render ss = Element "html" [] [Element "body" [] ss]
 
 -- Part 2 : Convert each component of the Markdown to a SimpleHTML
-convComp :: Component -> SimpleHTML String
-convComp (Heading h b) = Element (show h) [] (convBlock b)
-convComp (Paragraph b) = Element "p" [] (convBlock b) 
-convComp (Blockquote cs) = Element "blockquote" [] (map convComp cs)
-convComp (OrderedList ol) = Element "ol" [] (map convItem ol)
-convComp (UnorderedList ul) = Element "ul" [] (map convItem ul)
-convComp (TaskList ti) = Element "ul" [] (map convTaskItem ti)
-convComp (CodeBlock s) = Element "code" [] [PCDATA s]
-convComp HorizontalRule = Element "hr" [] [] 
-convComp Newline = Element "br" [] []
-convComp (Plain s) = convStmt s
+convCmpt :: Component -> SimpleHTML String
+convCmpt  (Heading h b) = Element (show h) [] (convBlock b)
+convCmpt  (Paragraph b) = Element "p" [] (convBlock b) 
+convCmpt  (Blockquote cs) = Element "blockquote" [] (map convCmpt cs)
+convCmpt (OrderedList ol) = Element "ol" [] (map convItem ol)
+convCmpt  (UnorderedList ul) = Element "ul" [] (map convItem ul)
+convCmpt  (TaskList ti) = Element "ul" [] (map convTaskItem ti)
+convCmpt  (CodeBlock s) = Element "code" [] [PCDATA s]
+convCmpt  HorizontalRule = Element "hr" [] [] 
+convCmpt  Newline = Element "br" [] []
+convCmpt  (Plain s) = convStmt s
 
 convItem :: Item -> SimpleHTML String 
-convItem item = Element "li" [] (map convComp item) 
+convItem item = Element "li" [] (map convCmpt item) 
 
 convTaskItem :: TaskItem -> SimpleHTML String 
-convTaskItem (TI True item) = Element "li" (addAttris [("class", Just "checked")]) (map convComp item) 
+convTaskItem (TI True item) = Element "li" (addAttris [("class", Just "checked")]) (map convCmpt item) 
 convTaskItem (TI False item) = convItem item
 
 -- Part 3 : Convert each statement within the component to a SimpleHTML
@@ -155,7 +164,7 @@ tTestLiteral =
 -- Unit tests of components
 tTestHeading :: Test
 tTestHeading = 
-  convComp (
+  convCmpt (
     Heading H1 (Block [Literal "H1 Heading", LineBreak, Literal "Continues"])
     ) ~?= Element "h1" [] [
       PCDATA "H1 Heading", 
@@ -166,7 +175,7 @@ tTestHeading =
 
 tTestParagraph :: Test
 tTestParagraph = 
-  convComp (
+  convCmpt (
     Paragraph (Block [
       Bold (Block [Literal "Hello "]), Italic (Block [Literal "World"])
       ])
@@ -180,7 +189,7 @@ tTestParagraph =
       -- "</p>"
     
 tTestBlockquote :: Test
-tTestBlockquote = convComp (
+tTestBlockquote = convCmpt (
   Blockquote [
     Plain (Literal "I love CIS552"), 
     Newline, 
@@ -235,7 +244,7 @@ expectedOrderedList = Element "ol" [] [
   -}
 
 tTestOrderedList :: Test 
-tTestOrderedList = convComp testOrderedList ~?= expectedOrderedList
+tTestOrderedList = convCmpt testOrderedList ~?= expectedOrderedList
 
 testUnorderedList :: Component 
 testUnorderedList = UnorderedList [
@@ -268,7 +277,7 @@ expectedUnorderedList = Element "ul" [] [
   -}
 
 tTestUnorderedList :: Test 
-tTestUnorderedList = convComp testUnorderedList ~?= expectedUnorderedList
+tTestUnorderedList = convCmpt testUnorderedList ~?= expectedUnorderedList
 
 testTaskList :: Component 
 testTaskList = TaskList [
@@ -285,19 +294,19 @@ expectedTaskList = Element "ul" [] [
   ]
 
 tTestTaskList :: Test 
-tTestTaskList = convComp testTaskList ~?= expectedTaskList
+tTestTaskList = convCmpt testTaskList ~?= expectedTaskList
 
 tTestCodeBlock :: Test
 tTestCodeBlock = 
-  convComp (CodeBlock "a + b = c") ~?= 
+  convCmpt (CodeBlock "a + b = c") ~?= 
     Element "code" [] [PCDATA "a + b = c"] --["<code>", "a + b = c", "</code>"]
 
 tTestHorinzontalRule :: Test
-tTestHorinzontalRule = convComp HorizontalRule ~?= Element "hr" [] [] --["<hr>"]
+tTestHorinzontalRule = convCmpt HorizontalRule ~?= Element "hr" [] [] --["<hr>"]
 
 tTestPlain :: Test
 tTestPlain = 
-  convComp (Plain (Literal "This is just a plain text")) ~?= 
+  convCmpt (Plain (Literal "This is just a plain text")) ~?= 
     PCDATA "This is just a plain text"
 
 -- Unit tests of Markdown
@@ -379,16 +388,10 @@ expected3 = render [Element "h5" [] [PCDATA  "H5 Heading"], Element "code" [] [P
 tTest3 :: Test 
 tTest3 = convert test3 ~?= expected3
 
--- TODO: Think of a property test
-
--- | Operations to build a whole HTML document
-empty :: SimpleHTML String
-empty = render []
-
--- insert (Heading H1 (Block [Literal "CIS 552"])) E -> Heading H1 (Block [Literal "CIS 552"])
-insert :: SimpleHTML String -> SimpleHTML String -> SimpleHTML String
-insert k h@(PCDATA s) = render (h : [k])
-insert k h@(Element tag attri ss) = Element tag attri (ss ++ [k])
+-- Below are some property tests
+insert :: SimpleHTML String -> SimpleHTML String -> Maybe (SimpleHTML String)
+insert k h@(PCDATA s) = Nothing
+insert k h@(Element tag attri ss) = Just $ Element tag attri (ss ++ [k])
 
 member :: SimpleHTML String -> SimpleHTML String -> Bool 
 member k h@(PCDATA _) = k == h 
@@ -398,30 +401,45 @@ elements :: SimpleHTML String -> [String]
 elements = Foldable.toList
 
 -- Model-based Property 
-prop_InsertModel :: SimpleHTML String -> SimpleHTML String -> Bool 
+prop_InsertModel :: SimpleHTML String -> SimpleHTML String -> Property
 prop_InsertModel k h = 
-  elements (insert k h) == elements h ++ elements k
+  Maybe.isJust (insert k h) ==> 
+    elements (Maybe.fromJust (insert k h)) == elements h ++ elements k
 
-k = Element "em" [] [PCDATA " and italic"]
-h = Element "strong" [] [PCDATA "Love is bold"] 
+prop_InsertStmt :: Statement -> Statement -> Property
+prop_InsertStmt s1 s2 = prop_InsertModel (convStmt s1) (convStmt s2)
 
--- >>> elements (insert k h)
--- ["strong","Love is bold","em"," and italic"]
+prop_InsertCmpt:: Component -> Component -> Property 
+prop_InsertCmpt c1 c2 = QC.within 1000000 $ prop_InsertModel (convCmpt c1) (convCmpt c2)
 
--- >>> elements h ++ elements k
--- ["strong","Love is bold","em"," and italic"]
+s1 = Literal "" 
+s2 = Backtick ""
 
--- TODO: Write generators for SimpleHTML String
+-- >>> Maybe.fromJust  (insert (convStmt s1) (convStmt s2))
+-- Element "code" [] [PCDATA "",PCDATA ""]
 
+-- >>> elements (Maybe.fromJust (insert (convStmt s1) (convStmt s2)))
+-- ["code","",""]
 
--- Below is some properties we would like to check for our html editor
+-- >>> elements (convStmt s1)
+-- [""]
+
+-- >>> elements (convStmt s2)
+-- ["code",""]
+
+-- >>> elements (convStmt s2) ++ elements (convStmt s1)
+-- ["code","",""]
+
+-- >>> elements (Maybe.fromJust (insert (convStmt s1) (convStmt s2))) == elements (convStmt s2) ++ elements (convStmt s1)
+-- True
 
 -- Post-Condiiton Property
-prop_FindPostPresent :: SimpleHTML String -> SimpleHTML String -> Bool 
-prop_FindPostPresent k h = member k (insert k h)
+prop_FindPostPresent :: SimpleHTML String -> SimpleHTML String -> Property
+prop_FindPostPresent k h = 
+  Maybe.isJust (insert k h) ==> member k (Maybe.fromJust (insert k h))
 
--- Metamorphic Property 
-prop_InsertEmpty :: SimpleHTML String -> Bool 
-prop_InsertEmpty k = elements (insert k empty) == elements k
+prop_FindPostPresentStmt :: Statement -> Statement -> Property 
+prop_FindPostPresentStmt s1 s2 = prop_FindPostPresent (convStmt s1) (convStmt s2)
 
-
+prop_FindPostPresentCmpt :: Component -> Component -> Property 
+prop_FindPostPresentCmpt c1 c2 = prop_FindPostPresent (convCmpt c1) (convCmpt c2)

@@ -94,13 +94,13 @@ genStringLit = escape <$> QC.listOf (QC.elements stringLitChars)
     stringLitChars = filter (\c -> c /= '\"' && (Char.isSpace c || Char.isPrint c)) ['\NUL' .. '~']
     
 
-genComponent :: Int -> Gen Component
-genComponent n | n <= 1 = QC.oneof [
+genCmpt :: Int -> Gen Component
+genCmpt n | n <= 1 = QC.oneof [
   return Newline, 
   return HorizontalRule, 
   CodeBlock <$> genStringLit
   ]
-genComponent n =
+genCmpt n =
   QC.frequency
     [ (1, return Newline),
       (1, return HorizontalRule),
@@ -112,21 +112,33 @@ genComponent n =
       (n, UnorderedList <$> genItems n'),
       (n, OrderedList <$> genItems n'),
       (n, TaskList <$> genTaskItems n'),
-      (n, Plain <$> genStatement n')
+      (n, Plain <$> genStmt n')
     ]
   where
     n' = n `div` 2
 
-genStatement :: Int -> Gen Statement
-genStatement n | n <= 1 = 
+genCmpts :: Int -> Gen [Component]
+genCmpts 0 = pure []
+genCmpts n =
+      QC.frequency
+        [ (1, return []),
+          (n, (:) <$> genCmpt n' <*> genCmpts n')
+        ]
+      where
+        n' = n `div` 2
+
+genBlock :: Int -> Gen Block 
+genBlock n = Block <$> genStmts n
+
+genStmt :: Int -> Gen Statement
+genStmt n | n <= 1 = 
   QC.oneof [
     Literal <$> genStringLit, 
     Backtick <$> genStringLit, 
     Image <$> genStringLit <*> genStringLit <*> genMaybe,
     return LineBreak
     ]
-
-genStatement n = 
+genStmt n = 
   QC.frequency [
     (1, Literal <$> genStringLit),
     (1, Backtick <$> genStringLit),
@@ -141,6 +153,16 @@ genStatement n =
   where
     n' = n `div` 2
 
+genStmts :: Int -> Gen [Statement]
+genStmts 0 = pure []
+genStmts n =
+      QC.frequency
+        [ (1, return []),
+          (n, (:) <$> genStmt n' <*> genStmts n')
+        ]
+      where
+        n' = n `div` 2
+
 -- | Some helper generators below
 genBool :: Gen Bool
 genBool = QC.oneof [return False, return True]
@@ -150,50 +172,40 @@ genMaybe = QC.oneof [return Nothing, Just <$> genStringLit]
 
 genItem :: Int -> Gen Item 
 genItem 0 = pure [] 
-genItem n = (:) <$> genComponent n <*> genCmpts (n `div` 2)
+genItem n = QC.frequency [
+  (1, return []),
+  (n, (:) <$> genCmpt n <*> genCmpts (n `div` 2))
+  ]
 
 genItems :: Int -> Gen [Item]
 genItems 0 = pure [] 
-genItems n = (:) <$> genItem n <*> genItems (n `div` 2)
+genItems n = QC.frequency [
+  (1, return []),
+  (n, (:) <$> genItem n <*> genItems (n `div` 2))
+  ] 
 
 genTaskItem :: Int -> Gen TaskItem 
 genTaskItem 0 = pure (TI False [])
-genTaskItem n = TI <$> genBool <*> genItem n
+genTaskItem n = QC.frequency [
+  (1, return (TI False [])),
+  (n, TI <$> genBool <*> genItem (n `div` 2))
+  ]
 
 genTaskItems :: Int -> Gen [TaskItem]
-genTaskItems n = (:) <$> genTaskItem n <*> genTaskItems (n `div` 2)
-
-genCmpts :: Int -> Gen [Component]
-genCmpts 0 = pure []
-genCmpts n =
-      QC.frequency
-        [ (1, return []),
-          (n, (:) <$> genComponent n' <*> genCmpts n')
-        ]
-      where
-        n' = n `div` 2
-
-genStmts :: Int -> Gen [Statement]
-genStmts 0 = pure []
-genStmts n =
-      QC.frequency
-        [ (1, return []),
-          (n, (:) <$> genStatement n' <*> genStmts n')
-        ]
-      where
-        n' = n `div` 2
-
-genBlock :: Int -> Gen Block 
-genBlock n = Block <$> genStmts n
+genTaskItems 0 = pure [] 
+genTaskItems n = QC.frequency [
+  (1, return []),
+  (n, (:) <$> genTaskItem n <*> genTaskItems (n `div` 2))
+  ]
 
 instance Arbitrary Component where
-  arbitrary = QC.sized genComponent
-
-instance Arbitrary Statement where 
-  arbitrary = QC.sized genStatement
+  arbitrary = QC.sized genCmpt
 
 instance Arbitrary Block where
   arbitrary = QC.sized genBlock 
+
+instance Arbitrary Statement where 
+  arbitrary = QC.sized genStmt
 
 sampleStatement :: IO ()
 sampleStatement = QC.sample' (arbitrary :: Gen Statement) >>= mapM_ print 
