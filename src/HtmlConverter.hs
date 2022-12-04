@@ -1,7 +1,7 @@
+{-# LANGUAGE DeriveFoldable #-}
 module HtmlConverter where 
 
-import Data.Foldable qualified as Foldable
-import Data.List qualified as List
+
 import Data.Semigroup ( Endo(Endo, appEndo) )
 import Test.HUnit (Test(..), (~?=), (~:), runTestTT)
 
@@ -386,64 +386,42 @@ empty :: SimpleHTML String
 empty = render []
 
 -- insert (Heading H1 (Block [Literal "CIS 552"])) E -> Heading H1 (Block [Literal "CIS 552"])
-insert :: SimpleHTML String -> [SimpleHTML String] -> [SimpleHTML String]
-insert = undefined
+insert :: SimpleHTML String -> SimpleHTML String -> SimpleHTML String
+insert k h@(PCDATA s) = render (h : [k])
+insert k h@(Element tag attri ss) = Element tag attri (ss ++ [k])
 
--- | Delete all matched component found 
-
-htmlDelete :: SimpleHTML String -> SimpleHTML String -> SimpleHTML String
-htmlDelete = undefined
-
-isMember :: SimpleHTML String -> [SimpleHTML String] -> Bool 
-isMember = undefined
+member :: SimpleHTML String -> SimpleHTML String -> Bool 
+member k h@(PCDATA _) = k == h 
+member k h@(Element tag attri ss) = k == h || any (member k) ss
 
 elements :: SimpleHTML String -> [String]
 elements = Foldable.toList
 
--- >>> elements (HLink "https://www.seas.upenn.edu/~cis5520/22fa" (PCDATA "CIS 552") (Just "this is title"))
--- ["https://www.seas.upenn.edu/~cis5520/22fa","CIS 552","this is title"]
-
-
--- Below is some properties we would like to check for our html editor
-{-
--- Post-Condiiton Property
-prop_FindPostPresent :: SimpleHTML String -> [SimpleHTML String] -> Bool 
-prop_FindPostPresent k h = isMember k (htmlInsert k h)
-
-prop_FindPostAbsent :: SimpleHTML String -> SimpleHTML String -> Bool 
-prop_FindPostAbsent k h = not (isMember k (htmlDelete k h))
-
--- Metamorphic Property 
-prop_InsertEmpty :: SimpleHTML String -> Bool 
-prop_InsertEmpty k = elements (htmlInsert k empty) == elements k
-
-prop_InsertInsert :: SimpleHTML String-> SimpleHTML String -> SimpleHTML String-> Bool 
-prop_InsertInsert x y h = htmlInsert x (htmlInsert y h) == htmlInsert y (htmlInsert x h)
-
-prop_InsertDelete :: SimpleHTML String -> SimpleHTML String -> SimpleHTML String -> Bool 
-prop_InsertDelete k k0 h = 
-  htmlInsert k (htmlDelete k0 h) == 
-    if k == k0 then htmlInsert k h else htmlDelete k0 (htmlInsert k h)
-
-prop_MemberInsert :: SimpleHTML String -> SimpleHTML String-> SimpleHTML String-> Bool 
-prop_MemberInsert k k0 h = 
-  isMember k0 (htmlInsert k h) == (k == k0 || isMember k0 h)
-
-prop_DeleteEmpty :: SimpleHTML String -> Bool 
-prop_DeleteEmpty k = htmlDelete k empty == empty 
-
-prop_DeleteInsert :: SimpleHTML String -> SimpleHTML String -> SimpleHTML String -> Bool 
-prop_DeleteInsert k k0 h = 
-  htmlDelete k (htmlInsert k0 h) == if k == k0 then 
-    if isMember k0 h then htmlDelete k h else h
-    else htmlInsert k0 (htmlDelete k h)
-
-prop_DeleteDelete :: SimpleHTML String -> SimpleHTML String -> SimpleHTML String -> Bool 
-prop_DeleteDelete x y h = 
-  htmlDelete x (htmlDelete y h) == htmlDelete y (htmlDelete x h)
-
 -- Model-based Property 
 prop_InsertModel :: SimpleHTML String -> SimpleHTML String -> Bool 
 prop_InsertModel k h = 
-  elements (htmlInsert k h) == elements h ++ elements k
--}
+  elements (insert k h) == elements h ++ elements k
+
+k = Element "em" [] [PCDATA " and italic"]
+h = Element "strong" [] [PCDATA "Love is bold"] 
+
+-- >>> elements (insert k h)
+-- ["strong","Love is bold","em"," and italic"]
+
+-- >>> elements h ++ elements k
+-- ["strong","Love is bold","em"," and italic"]
+
+-- TODO: Write generators for SimpleHTML String
+
+
+-- Below is some properties we would like to check for our html editor
+
+-- Post-Condiiton Property
+prop_FindPostPresent :: SimpleHTML String -> SimpleHTML String -> Bool 
+prop_FindPostPresent k h = member k (insert k h)
+
+-- Metamorphic Property 
+prop_InsertEmpty :: SimpleHTML String -> Bool 
+prop_InsertEmpty k = elements (insert k empty) == elements k
+
+

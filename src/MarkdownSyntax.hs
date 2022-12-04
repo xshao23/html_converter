@@ -1,3 +1,4 @@
+
 module MarkdownSyntax where 
 
 import Data.List 
@@ -22,7 +23,7 @@ data Component
   | CodeBlock String -- <code>
   | HorizontalRule -- <hr/>
   | Newline -- <br/>
-  | Plain Statement -- no open/close tags associated
+  | Plain Statement -- no component-level open/close tags associated
   deriving (Eq, Show)
 
 newtype Block = Block [Statement]
@@ -61,7 +62,6 @@ data Header
     deriving (Eq)
 
 instance Show Header where 
-  show :: Header -> String
   show H1 = "h1"
   show H2 = "h2"
   show H3 = "h3"
