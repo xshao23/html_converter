@@ -1,14 +1,7 @@
 module Tests where
 
 import Test.HUnit (Test(..), (~?=), (~:), runTestTT)
-import Data.Either (isLeft)
--- import Test.QuickCheck (Arbitrary(..), Testable(..), Gen, elements,
---     oneof, frequency, sized, quickCheckWith, stdArgs, maxSize,
---     classify,  maxSuccess, listOf, resize, scale, (==>))
-
-
 import MarkdownParser hiding (main)
-import HtmlEditor 
 import HtmlConverter
 
 -- Unit tests for convStmt
@@ -49,4 +42,6 @@ tMarkdownTest = "Markdown test" ~: TestList [
   tTest3
   ]
 -- >>> runTestTT tMarkdownTest
+-- Counts {cases = 3, tried = 3, errors = 0, failures = 0}
+
 
