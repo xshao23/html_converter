@@ -26,7 +26,13 @@ import HtmlConverter
       prop_InsertStmt,
       prop_FindPostPresentStmt,
       prop_FindPostPresentCmpt,
-      prop_InsertCmpt )
+      prop_InsertCmpt,
+      prop_InsertEmptyStmt,
+      prop_InsertEmptyCmpt,
+      prop_DeleteEmptyStmt,
+      prop_DeleteEmptyCmpt,
+      prop_DeleteDeleteStmt,
+      prop_DeleteDeleteCmpt )
 
 -- Unit tests for convStmt
 tStmtTest :: Test
@@ -74,14 +80,32 @@ runTests = do
   _ <- runTestTT tCmptTest 
   _ <- runTestTT tMarkdownTest
 
-  putStrLn "quickCheck prop_InsertStmt"
-  quickCheck prop_InsertStmt 
-
-  putStrLn "quickCheck prop_InsertCmpt"
-  quickCheck prop_InsertCmpt
-
   putStrLn "quickCheck prop_FindPostPresentStmt"
   quickCheck prop_FindPostPresentStmt
 
   putStrLn "quickCheck prop_FindPostPresentCmpt"
   quickCheck prop_FindPostPresentCmpt
+
+  putStrLn "quickCheck prop_InsertEmptyStmt"
+  quickCheck prop_InsertEmptyStmt
+
+  putStrLn "quickCheck prop_InsertEmptyCmpt"
+  quickCheck prop_InsertEmptyCmpt
+
+  putStrLn "quickCheck prop_DelettEmptyStmt"
+  quickCheck prop_DeleteEmptyStmt
+
+  putStrLn "quickCheck prop_DeleteEmptyCmpt"
+  quickCheck prop_DeleteEmptyCmpt
+
+  putStrLn "quickCheck prop_DelettDeleteStmt"
+  quickCheck prop_DeleteDeleteStmt
+
+  putStrLn "quickCheck prop_DeleteDeleteCmpt"
+  quickCheck prop_DeleteDeleteCmpt
+
+  putStrLn "quickCheck prop_InsertStmt"
+  quickCheck prop_InsertStmt 
+
+  putStrLn "quickCheck prop_InsertCmpt"
+  quickCheck prop_InsertCmpt

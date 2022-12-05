@@ -17,9 +17,11 @@ import qualified Data.Foldable as Foldable
 import qualified Test.QuickCheck as QC
 
 import MarkdownSyntax
+import qualified GHC.Generics as Maybe
 
 data SimpleHTML a
-  = PCDATA a
+  = E
+  | PCDATA a
   | Element a [(a, a)] [SimpleHTML a] -- Element ElementName Attri [..]
   deriving (Eq, Show, Foldable)
 
@@ -27,6 +29,7 @@ data SimpleHTML a
 html2string :: SimpleHTML String -> String
 html2string html = go html "" where
   go :: SimpleHTML String -> String -> String
+  go E = ("" ++)
   go (PCDATA s) = (s ++)
   go (Element tag attri []) = (("<" ++ tag ++ readAttris attri ++ "/>") ++ )
   -- TODO: Image does not have a closing tag
@@ -388,17 +391,73 @@ expected3 = render [Element "h5" [] [PCDATA  "H5 Heading"], Element "code" [] [P
 tTest3 :: Test 
 tTest3 = convert test3 ~?= expected3
 
--- Below are some property tests
+-- Below are some operations for property (HTML structure) tests
+empty :: SimpleHTML String 
+empty = E 
+
 insert :: SimpleHTML String -> SimpleHTML String -> Maybe (SimpleHTML String)
+insert k E = Just k
 insert k h@(PCDATA s) = Nothing
 insert k h@(Element tag attri ss) = Just $ Element tag attri (ss ++ [k])
 
+delete :: SimpleHTML String -> SimpleHTML String -> SimpleHTML String
+delete k h = 
+  if k == h then E 
+  else case h of 
+    Element tag attri ss -> Element tag attri (delete' k ss) 
+    _ -> h
+  where 
+    delete' :: SimpleHTML String -> [SimpleHTML String] -> [SimpleHTML String]
+    delete' k = foldr (\s acc -> if s == k then acc else delete k s : acc) []
+
 member :: SimpleHTML String -> SimpleHTML String -> Bool 
-member k h@(PCDATA _) = k == h 
+member E _ = True
 member k h@(Element tag attri ss) = k == h || any (member k) ss
+member k h = k == h 
 
 elements :: SimpleHTML String -> [String]
 elements = Foldable.toList
+
+-- Post-Condiiton Property
+prop_FindPostPresent :: SimpleHTML String -> SimpleHTML String -> Property
+prop_FindPostPresent k h = 
+  Maybe.isJust (insert k h) ==> member k (Maybe.fromJust (insert k h))
+
+prop_FindPostPresentStmt :: Statement -> Statement -> Property 
+prop_FindPostPresentStmt s1 s2 = prop_FindPostPresent (convStmt s1) (convStmt s2)
+
+prop_FindPostPresentCmpt :: Component -> Component -> Property 
+prop_FindPostPresentCmpt c1 c2 = prop_FindPostPresent (convCmpt c1) (convCmpt c2)
+
+-- Metamorphic Properties
+prop_InsertEmpty :: SimpleHTML String -> Bool
+prop_InsertEmpty k = 
+    elements (Maybe.fromJust (insert k empty)) == elements k
+
+prop_InsertEmptyStmt :: Statement -> Bool
+prop_InsertEmptyStmt s = prop_InsertEmpty (convStmt s)
+
+prop_InsertEmptyCmpt :: Component -> Bool
+prop_InsertEmptyCmpt c = prop_InsertEmpty (convCmpt c)
+
+prop_DeleteEmpty :: SimpleHTML String -> Bool
+prop_DeleteEmpty k = elements (delete k empty) == elements empty
+
+prop_DeleteEmptyStmt :: Statement -> Bool
+prop_DeleteEmptyStmt s = prop_DeleteEmpty (convStmt s)
+
+prop_DeleteEmptyCmpt :: Component -> Bool
+prop_DeleteEmptyCmpt c = prop_DeleteEmpty (convCmpt c)
+
+prop_DeleteDelete :: SimpleHTML String -> SimpleHTML String -> SimpleHTML String -> Bool 
+prop_DeleteDelete x y h = 
+  delete x (delete y h) == delete y (delete x h)
+
+prop_DeleteDeleteStmt :: Statement -> Statement -> Statement -> Bool 
+prop_DeleteDeleteStmt s1 s2 s = prop_DeleteDelete (convStmt s1) (convStmt s2) (convStmt s)
+
+prop_DeleteDeleteCmpt :: Component -> Component -> Component -> Bool 
+prop_DeleteDeleteCmpt c1 c2 c = prop_DeleteDelete (convCmpt c1) (convCmpt c2) (convCmpt c)
 
 -- Model-based Property 
 prop_InsertModel :: SimpleHTML String -> SimpleHTML String -> Property
@@ -411,35 +470,3 @@ prop_InsertStmt s1 s2 = prop_InsertModel (convStmt s1) (convStmt s2)
 
 prop_InsertCmpt:: Component -> Component -> Property 
 prop_InsertCmpt c1 c2 = QC.within 1000000 $ prop_InsertModel (convCmpt c1) (convCmpt c2)
-
-s1 = Literal "" 
-s2 = Backtick ""
-
--- >>> Maybe.fromJust  (insert (convStmt s1) (convStmt s2))
--- Element "code" [] [PCDATA "",PCDATA ""]
-
--- >>> elements (Maybe.fromJust (insert (convStmt s1) (convStmt s2)))
--- ["code","",""]
-
--- >>> elements (convStmt s1)
--- [""]
-
--- >>> elements (convStmt s2)
--- ["code",""]
-
--- >>> elements (convStmt s2) ++ elements (convStmt s1)
--- ["code","",""]
-
--- >>> elements (Maybe.fromJust (insert (convStmt s1) (convStmt s2))) == elements (convStmt s2) ++ elements (convStmt s1)
--- True
-
--- Post-Condiiton Property
-prop_FindPostPresent :: SimpleHTML String -> SimpleHTML String -> Property
-prop_FindPostPresent k h = 
-  Maybe.isJust (insert k h) ==> member k (Maybe.fromJust (insert k h))
-
-prop_FindPostPresentStmt :: Statement -> Statement -> Property 
-prop_FindPostPresentStmt s1 s2 = prop_FindPostPresent (convStmt s1) (convStmt s2)
-
-prop_FindPostPresentCmpt :: Component -> Component -> Property 
-prop_FindPostPresentCmpt c1 c2 = prop_FindPostPresent (convCmpt c1) (convCmpt c2)
