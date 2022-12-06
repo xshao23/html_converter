@@ -70,16 +70,17 @@ render ss = Element "html" [] [Element "body" [] ss]
 
 -- Part 2 : Convert each component of the Markdown to a SimpleHTML
 convCmpt :: Component -> SimpleHTML String
-convCmpt  (Heading h b) = Element (show h) [] (convBlock b)
-convCmpt  (Paragraph b) = Element "p" [] (convBlock b) 
-convCmpt  (Blockquote cs) = Element "blockquote" [] (map convCmpt cs)
+convCmpt (Heading h b) = Element (show h) [] (convBlock b)
+convCmpt (Paragraph b) = Element "p" [] (convBlock b) 
+convCmpt (Blockquote cs) = Element "blockquote" [] (map convCmpt cs)
 convCmpt (OrderedList ol) = Element "ol" [] (map convItem ol)
-convCmpt  (UnorderedList ul) = Element "ul" [] (map convItem ul)
-convCmpt  (TaskList ti) = Element "ul" [] (map convTaskItem ti)
-convCmpt  (CodeBlock s) = Element "code" [] [PCDATA s]
-convCmpt  HorizontalRule = Element "hr" [] [] 
-convCmpt  Newline = Element "br" [] []
-convCmpt  (Plain s) = convStmt s
+convCmpt (UnorderedList ul) = Element "ul" [] (map convItem ul)
+convCmpt (TaskList ti) = Element "ul" [] (map convTaskItem ti)
+convCmpt (Table tr) = Element "table" [] (map convRow tr)
+convCmpt (CodeBlock s) = Element "code" [] [PCDATA s]
+convCmpt HorizontalRule = Element "hr" [] [] 
+convCmpt Newline = Element "br" [] []
+convCmpt (Plain s) = convStmt s
 
 convItem :: Item -> SimpleHTML String 
 convItem item = Element "li" [] (map convCmpt item) 
@@ -87,6 +88,12 @@ convItem item = Element "li" [] (map convCmpt item)
 convTaskItem :: TaskItem -> SimpleHTML String 
 convTaskItem (TI True item) = Element "li" (addAttris [("class", Just "checked")]) (map convCmpt item) 
 convTaskItem (TI False item) = convItem item
+
+convRow :: Row -> SimpleHTML String 
+convRow row = Element "tr" [] (map convCol row)
+
+convCol :: Component -> SimpleHTML String 
+convCol col = Element "th" [] [convCmpt col]
 
 -- Part 3 : Convert each statement within the component to a SimpleHTML
 convBlock :: Block -> [SimpleHTML String]
@@ -103,6 +110,9 @@ convStmt (Image alt src title) = Element "img" (
 convStmt (Bold b) = Element "strong" [] (convBlock b)
 convStmt (Italic b) = Element "em" [] (convBlock b)
 convStmt (Strikethrough b) = Element "s" [] (convBlock b)
+convStmt (Highlight b) = Element "mark" [] (convBlock b)
+convStmt (Sub b) = Element "sub" [] (convBlock b) 
+convStmt (Sup b) = Element "sup" [] (convBlock b)
 convStmt (Link b href title) = Element "a" (
   addAttris [("href", Just href), ("title", title)]
   ) (convBlock b)
@@ -134,10 +144,46 @@ tTestBoldItalic =
     Element "em" [] [PCDATA " and italic"]
   ]
 
+tTestStrikethrough :: Test 
+tTestStrikethrough = 
+  convStmt (Strikethrough (Block [
+    Literal "This is outdated",
+    Bold (Block [Literal " long time ago"])
+  ])) ~?= 
+    Element "s" [] [
+      PCDATA "This is outdated",
+      Element "strong" [] [PCDATA " long time ago"]
+    ]
+
+tTestHighlight :: Test 
+tTestHighlight = 
+  convStmt (Highlight (Block [Literal "This is very essential"])) ~?= 
+    Element "mark" [] [PCDATA "This is very essential"]
+
+tTestSub :: Test 
+tTestSub = 
+  convCmpt (Paragraph (Block [
+    Literal "H", 
+    Sub (Block [Literal "2"]),
+    Literal "O"
+    ])) ~?= 
+      Element "p" [] [PCDATA "H", Element "sub" [] [PCDATA "2"], PCDATA "O"]
+
+tTestSup :: Test 
+tTestSup = 
+  convCmpt (Paragraph (Block [
+    Literal "X",
+    Sup (Block [Literal "2"])
+  ])) ~?= Element "p" [] [PCDATA "X", Element "sup" [] [PCDATA "2"]]
+
 tTestBacktick :: Test 
 tTestBacktick = 
   convStmt (Backtick "thisIsCode()") ~?= 
     Element "code" [] [PCDATA "thisIsCode()"]
+
+tTestEmoji :: Test 
+tTestEmoji = convStmt (Emoji "129409") ~?= 
+  PCDATA "&#129409;"
 
 tTestLink :: Test
 tTestLink = 
@@ -299,6 +345,68 @@ expectedTaskList = Element "ul" [] [
 tTestTaskList :: Test 
 tTestTaskList = convCmpt testTaskList ~?= expectedTaskList
 
+testTable :: Component
+testTable = Table [
+  [
+    Plain (Bold (Block [Literal "Company"])), 
+    Plain (Bold (Block [Literal "Contact"])), 
+    Plain (Bold (Block [Literal "Country"]))
+    ],
+  [
+    Plain (Literal "Alfreds Futterkiste"), 
+    Plain (Literal "Maria Anders"), 
+    Plain (Literal "Germany")
+    ],
+  [
+    Plain (Literal "Centro comercial Moctezuma"), 
+    Plain (Literal "Francisco Chang"), 
+    Plain (Literal "Mexico")
+    ]
+  ]
+
+expectedTable :: SimpleHTML String 
+expectedTable = Element "table" [] [
+  Element "tr" [] [
+    Element "th" [] [Element "strong" [] [PCDATA "Company"]],
+    Element "th" [] [Element "strong" [] [PCDATA "Contact"]],
+    Element "th" [] [Element "strong" [] [PCDATA "Country"]]
+    ],
+
+  Element "tr" [] [
+    Element "th" [] [PCDATA "Alfreds Futterkiste"],
+    Element "th" [] [PCDATA "Maria Anders"],
+    Element "th" [] [PCDATA "Germany"]
+    ],
+
+  Element "tr" [] [
+    Element "th" [] [PCDATA "Centro comercial Moctezuma"],
+    Element "th" [] [PCDATA "Francisco Chang"],
+    Element "th" [] [PCDATA "Mexico"]
+    ]
+  ]
+
+tTestTable :: Test
+tTestTable = convCmpt testTable ~?= expectedTable
+
+{-
+<table>
+  <tr>
+    <th><strong>Company</strong></th>
+    <th><strong>Contact</strong></th>
+    <th><strong>Country</strong></th>
+  </tr>
+  <tr>
+    <th>Alfreds Futterkiste</th>
+    <th>Maria Anders</th>
+    <th>Germany</th></tr>
+  <tr>
+    <th>Centro comercial Moctezuma</th>
+    <th>Francisco Chang</th>
+    <th>Mexico</th>
+  </tr>
+</table>"
+-}
+
 tTestCodeBlock :: Test
 tTestCodeBlock = 
   convCmpt (CodeBlock "a + b = c") ~?= 
@@ -429,6 +537,15 @@ prop_FindPostPresentStmt s1 s2 = prop_FindPostPresent (convStmt s1) (convStmt s2
 prop_FindPostPresentCmpt :: Component -> Component -> Property 
 prop_FindPostPresentCmpt c1 c2 = prop_FindPostPresent (convCmpt c1) (convCmpt c2)
 
+prop_FindPostAbsent :: SimpleHTML String -> SimpleHTML String -> Bool
+prop_FindPostAbsent k h = not (member k (delete k h))
+
+prop_FindPostAbsentStmt :: Statement -> Statement -> Bool 
+prop_FindPostAbsentStmt s1 s2 = prop_FindPostAbsent (convStmt s1) (convStmt s2)
+
+prop_FindPostAbsentCmpt :: Component -> Component -> Bool 
+prop_FindPostAbsentCmpt c1 c2 = prop_FindPostAbsent (convCmpt c1) (convCmpt c2)
+
 -- Metamorphic Properties
 prop_InsertEmpty :: SimpleHTML String -> Bool
 prop_InsertEmpty k = 
@@ -441,7 +558,7 @@ prop_InsertEmptyCmpt :: Component -> Bool
 prop_InsertEmptyCmpt c = prop_InsertEmpty (convCmpt c)
 
 prop_DeleteEmpty :: SimpleHTML String -> Bool
-prop_DeleteEmpty k = elements (delete k empty) == elements empty
+prop_DeleteEmpty k = null $ elements (delete k empty)
 
 prop_DeleteEmptyStmt :: Statement -> Bool
 prop_DeleteEmptyStmt s = prop_DeleteEmpty (convStmt s)

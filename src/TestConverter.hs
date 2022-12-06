@@ -6,7 +6,12 @@ import HtmlConverter
     ( tTestBold,
       tTestItalic,
       tTestBoldItalic,
+      tTestStrikethrough,
+      tTestHighlight,
+      tTestSub,
+      tTestSup,
       tTestBacktick,
+      tTestEmoji,
       tTestLink,
       tTestImage,
       tTestLineBreak,
@@ -17,6 +22,7 @@ import HtmlConverter
       tTestOrderedList,
       tTestUnorderedList,
       tTestTaskList,
+      tTestTable,
       tTestCodeBlock,
       tTestHorinzontalRule,
       tTestPlain,
@@ -26,6 +32,8 @@ import HtmlConverter
       prop_InsertStmt,
       prop_FindPostPresentStmt,
       prop_FindPostPresentCmpt,
+      prop_FindPostAbsentStmt,
+      prop_FindPostAbsentCmpt,
       prop_InsertCmpt,
       prop_InsertEmptyStmt,
       prop_InsertEmptyCmpt,
@@ -40,7 +48,12 @@ tStmtTest = "Statement test" ~: TestList [
   tTestBold,
   tTestItalic,
   tTestBoldItalic,
+  tTestStrikethrough,
+  tTestHighlight,
+  tTestSub,
+  tTestSup,
   tTestBacktick,
+  tTestEmoji,
   tTestLink,
   tTestImage,
   tTestLineBreak,
@@ -58,6 +71,7 @@ tCmptTest = "Component test" ~: TestList [
   tTestOrderedList,
   tTestUnorderedList,
   tTestTaskList,
+  tTestTable,
   tTestCodeBlock,
   tTestHorinzontalRule,
   tTestPlain
@@ -85,6 +99,12 @@ runTests = do
 
   putStrLn "quickCheck prop_FindPostPresentCmpt"
   quickCheck prop_FindPostPresentCmpt
+
+  putStrLn "quickCheck prop_FindPostAbsentStmt"
+  quickCheck prop_FindPostAbsentStmt
+
+  putStrLn "quickCheck prop_FindPostAbsentCmpt"
+  quickCheck prop_FindPostAbsentCmpt
 
   putStrLn "quickCheck prop_InsertEmptyStmt"
   quickCheck prop_InsertEmptyStmt

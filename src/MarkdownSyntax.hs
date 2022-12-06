@@ -12,6 +12,7 @@ import qualified Test.QuickCheck as QC
 newtype Markdown = Markdown [Component]
   deriving (Eq, Show)
 
+-- TODO: Add Definition List, Footnote, Heading ID
 -- See https://www.markdownguide.org/basic-syntax
 data Component
   = Heading Header Block -- <h1>
@@ -20,11 +21,20 @@ data Component
   | OrderedList [Item] -- <ol>
   | UnorderedList [Item] -- <ul>
   | TaskList [TaskItem] -- <ul class="checked">
+  | Table [Row]
   | CodeBlock String -- <code>
   | HorizontalRule -- <hr/>
   | Newline -- <br/>
   | Plain Statement -- no component-level open/close tags associated
   deriving (Eq, Show)
+
+type Item = [Component]
+
+data TaskItem = TI Bool [Component]
+  deriving (Eq, Show)
+
+type Row = [Col] 
+type Col = Component
 
 newtype Block = Block [Statement]
   deriving (Eq, Show)
@@ -35,22 +45,20 @@ instance Semigroup Block where
 instance Monoid Block where
   mempty = Block []
 
-type Item = [Component]
-
-data TaskItem = TI Bool [Component]
-  deriving (Eq, Show)
-
 data Statement
-    = Bold Block 
-    | Italic Block 
-    | Strikethrough Block
-    | Backtick String 
-    | Emoji String
-    | Link Block String (Maybe String) -- optional title  
-    | Image String String (Maybe String) -- alt src optional title
-    | LineBreak -- <br>
-    | Literal String
-    deriving (Eq, Show)
+  = Bold Block -- <strong>
+  | Italic Block -- <em>
+  | Strikethrough Block -- <s>
+  | Highlight Block
+  | Sub Block 
+  | Sup Block
+  | Backtick String -- <code>
+  | Emoji String -- &#...;
+  | Link Block String (Maybe String) -- optional title  
+  | Image String String (Maybe String) -- alt src optional title
+  | LineBreak -- <br>
+  | Literal String
+  deriving (Eq, Show)
     
 data Header
     = H1
@@ -112,6 +120,7 @@ genCmpt n =
       (n, UnorderedList <$> genItems n'),
       (n, OrderedList <$> genItems n'),
       (n, TaskList <$> genTaskItems n'),
+      (n, Table <$> genRows n'),
       (n, Plain <$> genStmt n')
     ]
   where
@@ -148,6 +157,9 @@ genStmt n =
     (n, Bold <$> genBlock n'),
     (n, Italic <$> genBlock n'),
     (n, Strikethrough <$> genBlock n'),
+    (n, Highlight <$> genBlock n'),
+    (n, Sub <$> genBlock n'),
+    (n, Sup <$> genBlock n'),
     (n, Link <$> genBlock n' <*> genStringLit <*> genMaybe)
     ]
   where
@@ -197,6 +209,16 @@ genTaskItems n = QC.frequency [
   (1, return []),
   (n, (:) <$> genTaskItem n <*> genTaskItems (n `div` 2))
   ]
+
+genRow :: Int -> Gen Row 
+genRow = genItem
+
+genRows :: Int -> Gen [Row] 
+genRows 0 = pure [] 
+genRows n = QC.frequency [
+  (1, return []),
+  (n, (:) <$> genRow n <*> genRows (n `div` 2))
+  ] 
 
 instance Arbitrary Component where
   arbitrary = QC.sized genCmpt
