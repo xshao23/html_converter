@@ -1,10 +1,10 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Use $>" #-}
+
 module MarkdownParser where 
 
-import Control.Applicative
+import Control.Applicative ( Alternative(many) )
 import Data.Char (isNumber)
-
 import Test.HUnit (Assertion, Counts, Test (..), assert, runTestTT, (~:), (~?=))
 import Test.QuickCheck as QC
 
@@ -17,7 +17,20 @@ import MarkdownSyntax
 -- Note that Markdown file consists of many components (in parallel)
 -- See MarkdownSyntax line 12
 parseMarkdownFile :: String -> IO (Either P.ParseError Markdown)
-parseMarkdownFile = undefined
+parseMarkdownFile = P.parseFromFile (const <$> markdownP <*> P.eof)
+
+-- 下面四个是我看着LuParser加上的，如果后来你发现不需要就删掉吧。
+markdownP :: Parser Markdown 
+markdownP = Markdown <$> many componentP
+
+parseMarkdownCmpt :: String -> Either P.ParseError Component
+parseMarkdownCmpt = P.parse componentP
+
+blockP :: Parser Block
+blockP = Block <$> many statementP
+
+parseMarkdownStmt :: String -> Either P.ParseError Statement
+parseMarkdownStmt = P.parse statementP
 
 -- | Skip whitespace 
 wsP :: Parser a -> Parser a
@@ -55,16 +68,11 @@ test_constP =
       P.parse (many (constP "&" 'a')) "&   &" ~?= Right "aa"
     ]
 
-
 componentP :: Parser Component
 componentP  = undefined
 
-blockP :: Parser Block 
-blockP = undefined
-
 statementP :: Parser Statement 
 statementP = undefined
-
 
 itemP :: Parser Item
 itemP = undefined 
@@ -102,7 +110,6 @@ newlineP = undefined
 
 plainP :: Parser Component
 plainP = undefined
-
 
 boldP :: Parser Statement
 boldP = undefined
