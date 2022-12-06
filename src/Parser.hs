@@ -1,16 +1,11 @@
-{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE InstanceSigs, LambdaCase #-}
 
 -- | A small, applicative-based parsing library
 -- NOTE: this library does not export the `P` data constructor.
 -- All `Parser`s must be built using the following functions
 -- exported by this file, as well as the `Functor`, `Applicative` and
 -- `Alternative` operations.
-module Parser (Parser, doParse, get, eof, filter, 
-                          parse, parseFromFile, ParseError,
-                          satisfy, alpha, digit, upper, lower, space,
-                          char, string, int,
-                          chainl1, chainl, choice,
-                          between, sepBy1, sepBy) where
+module Parser where
 
 import Prelude hiding (filter)
 

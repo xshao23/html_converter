@@ -25,6 +25,12 @@ data SimpleHTML a
   | Element a [(a, a)] [SimpleHTML a] -- Element ElementName Attri [..]
   deriving (Eq, Show, Foldable)
 
+convertMarkdownContent :: Markdown -> String 
+convertMarkdownContent = html2string . convert 
+
+error :: String 
+error = html2string (render [PCDATA "Error Parsing the File"])
+
 -- Part 0 : Convert a SimpleHTML value to a string
 html2string :: SimpleHTML String -> String
 html2string html = go html "" where

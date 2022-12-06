@@ -4,14 +4,20 @@ module MarkdownParser where
 
 import Control.Applicative
 import Data.Char (isNumber)
-import Data.Char qualified as Char
-import Data.Char qualified as P
-import MarkdownSyntax
-import Parser (Parser)
-import Parser qualified as P
-import Test.HUnit (Assertion, Counts, Test (..), assert, runTestTT, (~:), (~?=))
-import Test.QuickCheck qualified as QC
 
+import Test.HUnit (Assertion, Counts, Test (..), assert, runTestTT, (~:), (~?=))
+import Test.QuickCheck as QC
+
+import Parser (Parser)
+import qualified Parser as P
+
+import MarkdownSyntax
+
+-- The function below will be called by IOHandler (borrowed from parseLuFile)
+-- Note that Markdown file consists of many components (in parallel)
+-- See MarkdownSyntax line 12
+parseMarkdownFile :: String -> IO (Either P.ParseError Markdown)
+parseMarkdownFile = undefined
 
 -- | Skip whitespace 
 wsP :: Parser a -> Parser a
