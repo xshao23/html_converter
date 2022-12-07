@@ -12,16 +12,17 @@ import qualified Test.QuickCheck as QC
 newtype Markdown = Markdown [Component]
   deriving (Eq, Show)
 
--- TODO: Add Definition List, Footnote, Heading ID
+-- TODO: Only Footnote left
 -- See https://www.markdownguide.org/basic-syntax
 data Component
-  = Heading Header Block -- <h1>
+  = Heading Header Block (Maybe String) -- <h1> with optional headingID
   | Paragraph Block -- <p>
   | Blockquote [Component] -- <blockquote>
   | OrderedList [Item] -- <ol>
   | UnorderedList [Item] -- <ul>
   | TaskList [TaskItem] -- <ul class="checked">
   | Table [Row]
+  | DefinitionList [DefItem]
   | CodeBlock String -- <code>
   | HorizontalRule -- <hr/>
   | Newline -- <br/>
@@ -35,6 +36,9 @@ data TaskItem = TI Bool [Component]
 
 type Row = [Col] 
 type Col = Component
+
+data DefItem = DI Component [Component]
+  deriving (Eq, Show)
 
 newtype Block = Block [Statement]
   deriving (Eq, Show)
@@ -114,13 +118,14 @@ genCmpt n =
       (1, return HorizontalRule),
       (1, CodeBlock <$> genStringLit),
       -- generate loops half as frequently as if statements
-      (n, Heading <$> genHeader <*> genBlock n'),
+      (n, Heading <$> genHeader <*> genBlock n' <*> genMaybe),
       (n, Paragraph <$> genBlock n'),
       (n, Blockquote <$> genCmpts n'),
       (n, UnorderedList <$> genItems n'),
       (n, OrderedList <$> genItems n'),
       (n, TaskList <$> genTaskItems n'),
       (n, Table <$> genRows n'),
+      (n, DefinitionList <$> genDefItems n'),
       (n, Plain <$> genStmt n')
     ]
   where
@@ -210,15 +215,26 @@ genTaskItems n = QC.frequency [
   (n, (:) <$> genTaskItem n <*> genTaskItems (n `div` 2))
   ]
 
-genRow :: Int -> Gen Row 
-genRow = genItem
-
 genRows :: Int -> Gen [Row] 
 genRows 0 = pure [] 
 genRows n = QC.frequency [
   (1, return []),
-  (n, (:) <$> genRow n <*> genRows (n `div` 2))
+  (n, (:) <$> genItem n <*> genRows (n `div` 2))
   ] 
+
+genDefItem :: Int -> Gen DefItem 
+genDefItem 0 = DI <$> genCmpt 0 <*> pure []
+genDefItem n = QC.frequency [
+  (1, DI <$> genCmpt 0 <*> pure []),
+  (n, DI <$> genCmpt n <*> genCmpts (n `div` 2))
+  ]
+
+genDefItems :: Int -> Gen [DefItem]
+genDefItems 0 = pure [] 
+genDefItems n = QC.frequency [
+  (1, return []),
+  (n, (:) <$> genDefItem n <*> genDefItems (n `div` 2))
+  ]
 
 instance Arbitrary Component where
   arbitrary = QC.sized genCmpt

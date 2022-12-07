@@ -17,12 +17,14 @@ import HtmlConverter
       tTestLineBreak,
       tTestLiteral,
       tTestHeading,
+      tTestHeadingID,
       tTestParagraph,
       tTestBlockquote,
       tTestOrderedList,
       tTestUnorderedList,
       tTestTaskList,
       tTestTable,
+      tTestDefinitionList,
       tTestCodeBlock,
       tTestHorinzontalRule,
       tTestPlain,
@@ -61,23 +63,25 @@ tStmtTest = "Statement test" ~: TestList [
   ]
 
 -- >>> runTestTT tStmtTest 
--- Counts {cases = 8, tried = 8, errors = 0, failures = 0}
+-- Counts {cases = 13, tried = 13, errors = 0, failures = 0}
 
 tCmptTest :: Test 
 tCmptTest = "Component test" ~: TestList [
   tTestHeading,
+  tTestHeadingID,
   tTestParagraph,
   tTestBlockquote,
   tTestOrderedList,
   tTestUnorderedList,
   tTestTaskList,
   tTestTable,
+  tTestDefinitionList,
   tTestCodeBlock,
   tTestHorinzontalRule,
   tTestPlain
   ]
 -- >>> runTestTT tCmptTest
--- Counts {cases = 9, tried = 9, errors = 0, failures = 0}
+-- Counts {cases = 12, tried = 12, errors = 0, failures = 0}
 
 tMarkdownTest :: Test 
 tMarkdownTest = "Markdown test" ~: TestList [
