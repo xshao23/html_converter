@@ -1,4 +1,3 @@
-
 module MarkdownSyntax where 
 
 import Data.List 

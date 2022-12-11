@@ -8,10 +8,14 @@ import Data.Char (isNumber)
 import Test.HUnit (Assertion, Counts, Test (..), assert, runTestTT, (~:), (~?=))
 import Test.QuickCheck as QC
 
-import Parser (Parser)
-import qualified Parser as P
+--import Parser (Parser)
+--import qualified Parser as P
+
+import Text.Parsec.Char
+import Text.ParserCombinators.Parsec hiding (runParser)
 
 import MarkdownSyntax
+
 
 -- The function below will be called by IOHandler (borrowed from parseLuFile)
 -- Note that Markdown file consists of many components (in parallel)
