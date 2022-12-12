@@ -20,6 +20,7 @@ import Text.ParserCombinators.Parsec hiding (runParser, between, parseFromFile)
 import Text.Parsec.Pos
 import MarkdownSyntax
 import Text.Parsec.Error (newErrorUnknown)
+import Text.Parsec (runParserT)
 
 -- The function below will be called by IOHandler (borrowed from parseLuFile)
 -- Note that Markdown file consists of many components (in parallel)
@@ -91,13 +92,13 @@ wsp :: Parser String
 wsp = many (char ' ')
 
 someTill :: Parser a -> Parser end -> Parser [a]
-someTill p end = try ((:[]) <$> p <* end) <|> liftA2 (:) p (someTill p end)
+someTill p end = liftA2 (:) p (manyTill p end)
 
 surround :: Parser start -> Parser end -> Parser Block
 surround start end = start *> (Block <$> someTill statementP (try end))
 
 between ::  String -> String -> Parser Block
-between  start end = surround (string start) (string end)
+between start end = surround (string start) (string end)
 
 boldP ::   Parser Statement
 boldP  = Bold <$> (between "**" "**" <|> try (between "__" "__"))
@@ -136,7 +137,7 @@ statementP :: Parser Statement
 statementP = notFollowedBy (endOfLine *> wsp *> endOfLine) *> choice [
   try backtickP, 
   try imageP, 
-  try autoLinkP, 
+  --try autoLinkP, 
   try linkP,
   try boldP, 
   try italicsP, 
@@ -187,7 +188,7 @@ linkP = (\text (link, title) -> Link text link title)
   where
     statementP' :: Parser Statement
     statementP' = try $ do
-                  notFollowedBy autoLinkP
+                  --notFollowedBy autoLinkP
                   notFollowedBy linkP 
                   statementP
 
@@ -198,7 +199,7 @@ imageP = (\alt (link, title) -> Image alt link title)
 
 
 reserved :: String
-reserved = "*_`)[] <!#\n\\~\\^"
+reserved = "*_`)[] <!#\n\\~\\^\\="
 
 isReserved :: Char -> Bool
 isReserved c = c `elem` reserved
@@ -215,7 +216,7 @@ dropWspOnly s = reverse (dropS (reverse s)) where
   dropS ls@(x:xs) = if x == ' ' then dropS xs else ls
   dropS [] = []
 
-
+{-
 autoLinkP :: Parser Statement
 autoLinkP = (\s -> Link (Block [Literal s]) s Nothing) <$> p
   where
@@ -232,7 +233,7 @@ autoLinkP = (\s -> Link (Block [Literal s]) s Nothing) <$> p
     whiteList =  Set.fromList ("ABCDEFGHIJKLMNOPQRSTUVWXYZ" 
                             ++ "abcdefghijklmnopqrstuvwxyz"
                             ++ "0123456789-._~:/?#[]@!$&'()*+,;=")
-
+-}
 doParse :: Parser a -> String -> Either ParseError a
 doParse p = parse p ""
 
@@ -244,30 +245,8 @@ headingP = do
   hText <- some (char ' ') *> blockP
   return (Heading (getHeader (length hLevel)) hText)
 
-combineStmts :: Block -> Block
-combineStmts (Block []) = Block []
-combineStmts (Block [x]) = Block [x]
-combineStmts (Block (s1 : s2 : ss)) = case (s1, s2) of
-  (Literal a, Literal b@"\n") -> combineStmts $ Block (Literal (strip a ++ b) : ss)
-  (Literal a, Literal b) -> combineStmts $ combineStr Literal a b ss
-  (Bold b1, Bold b2) -> combineStmts $ combineBlk Bold b1 b2 ss
-  (Italic b1, Italic b2) -> combineStmts $ combineBlk Italic b1 b2 ss
-  (Strikethrough b1, Strikethrough b2) -> combineStmts $ combineBlk Strikethrough b1 b2 ss
-  (Highlight b1, Highlight b2) -> combineStmts $ combineBlk Highlight b1 b2 ss
-  (Sub b1, Sub b2) -> combineStmts $ combineBlk Sub b1 b2 ss
-  (Sup b1, Sup b2) -> combineStmts $ combineBlk Sup b1 b2 ss
-  (Backtick a, Backtick b) -> combineStmts $ combineStr Backtick a b ss
-  (Emoji a, Emoji b) -> combineStmts $ combineStr Emoji a b ss
-  _ -> Block [s1] <> combineStmts (Block (s2 : ss))
-
-combineBlk :: (Block -> Statement) -> Block -> Block -> [Statement] -> Block 
-combineBlk f x y xs = Block (f (combineStmts (x <> y)) : xs)
-
-combineStr :: (String -> Statement) -> String -> String -> [Statement] -> Block 
-combineStr f x y xs = Block (f (x ++ y) : xs)
-
 paragraphP :: Parser Component
-paragraphP = Paragraph . combineStmts . Block <$>
+paragraphP = Paragraph . Block <$>
   (try (
     someTill statementP (
       try (endOfLine *> endOfLine) <|> lookAhead (endOfLine <* wsp <* lookAhead stopP)
@@ -275,7 +254,7 @@ paragraphP = Paragraph . combineStmts . Block <$>
   ) <|> some statementP)
 
 stopP :: Parser Component
-stopP = try hrP <|> try headingP  <|> try listP
+stopP = try hrP <|> try headingP <|> try listP
 
 hrP :: Parser Component
 hrP = wsp *> (hrP' '*' <|> hrP' '-' <|> hrP' '_')
@@ -284,9 +263,11 @@ hrP = wsp *> (hrP' '*' <|> hrP' '-' <|> hrP' '_')
     hrP' c = do
       t <- count 3 (char c <* wsp)
       i <- many (char (head t) <* wsp) *> optionMaybe (satisfy (/='\n'))
+      {-
       case i of
         Just _ -> fail "Unrecognized horizontal rules"
         Nothing -> return ()
+        -}
       return HorizontalRule
 
 plainP :: Parser Component 
@@ -297,62 +278,66 @@ uiP :: Parser Item
 uiP = do
   sps <- lookAhead (wsp <* oneOf "-*+")
   sps2 <- try (wsp *> oneOf "-*+" *> some (char ' '))
-  c <- statementP
+  c <- componentP
   _ <- many (try (wsp *> endOfLine))
   -- _ <- trace ("DEBUG: indentation depth" ++ show (length sps + length sps2  +1)) (length sps + length sps2  +1)
-  cs <- many (indentedStmtP (length sps + length sps2 + 1))
+  cs <- many (indentedCmptP (length sps + length sps2 + 1))
   return (c : cs)
 
 trace2 :: Show a => [Char] -> a -> a
 trace2 name x = trace (name ++ ": " ++ show x) x
 
-indentedStmtP :: Int -> Parser Statement
-indentedStmtP i = do
+indentedCmptP :: Int -> Parser Component
+indentedCmptP i = do
   -- _ <- lookAhead (wsp *> noneOf "-*+")
   sps <- try (count i (char ' '))
-  s <- try statementP
+  s <- try componentP
   _ <- many (try (wsp *> endOfLine))
   return s
 
 {-
 
-- First 
-- Second 
-  - A 
-  - B
+- A 
+- B
+  - C 
+  - D
 -}
+
+unorderedItemP :: Int -> Parser Item
+unorderedItemP i = do 
+  _ <- try (count i (char ' '))
+  item <- oneOf "-*+" *> wsp *> many (satisfy (not . isReserved)) <* endOfLine 
+  case runParserT (count (i + 2) (char ' ')) of
+    Left _ -> return [Plain (Literal item)]
+    Right _ -> do 
+      uis <- unorderedItemsP (i + 2)
+      return [Plain (Literal item), UnorderedList uis]
+
+unorderedItemsP :: Int -> Parser [Item]
+unorderedItemsP i = do 
+  item <- oneOf "-*+" *> wsp *> many (satisfy (not . isReserved)) <* endOfLine 
+  items <- many (unorderedItemP i)
+  return $ [Plain (Literal item)] : items
+
+-- >>> doParse (unorderedItemP 0) "- A\n- B"
+-- Left (line 2, column 1):
+-- unexpected "-"
+-- expecting " "
 
 oiP :: Parser Item
 oiP = do
   sps <- lookAhead (wsp <* many digit <* char '.')
   num <- lookAhead (many digit <* char '.')
   sps2 <- try (wsp *> (many digit <* char '.') *> some (char ' '))
-  c <- statementP
+  c <- componentP
   _ <- many (try (wsp *> endOfLine))
   cs <- many (orderedIndentedBlockP (length sps + length sps2 + length num + 1)) 
   return (c : cs)
 
-orderedIndentedBlockP :: Int -> Parser Statement
+orderedIndentedBlockP :: Int -> Parser Component
 orderedIndentedBlockP i = do
   _ <- lookAhead (wsp *> notFollowedBy (many digit <* char '.'))
-  indentedStmtP i
-
-parseList :: Parser Component
-parseList = parseOrderedList <|> parseUnorderedList
-  where parseOrderedList :: Parser Component
-        parseOrderedList = many1 orderedListItem Data.Functor.<&> OrderedList
-
-        orderedListItem :: Parser Item
-        orderedListItem = ((many1 digit >> char '.') <* spaces) >> parseInlines
-
-        parseUnorderedList :: Parser Component
-        parseUnorderedList = many1 unorderedListItem Data.Functor.<&> UnorderedList
-
-        unorderedListItem :: Parser Item
-        unorderedListItem = (oneOf "-*+" <* spaces) >> parseInlines
-
-parseInlines :: Parser [Statement]
-parseInlines = manyTill statementP endOfLine
+  indentedCmptP i
 
 tt = "- A\n- B\n  - C\n  - D\n"
 
@@ -411,21 +396,45 @@ componentP = (
   <|> try headingP 
   <|> try listP 
   <|> try paragraphP
+  <|> try plainP
   ) <* optional (many endOfLine)
 
 
 -- | pass in previous level depth
-{- 
+
 itemP :: Int -> Parser Item
 itemP i = do 
-  sps <- try (wsp <* oneOf "-*+") 
+  _ <- lookAhead eof
+  _ <- try (count i wsp)
   _ <- try (oneOf "-*+" *> some (char ' ')) -- keep 
   c <- try componentP
   _ <- many (try (wsp *> endOfLine))
   cs <- try (count 2 (char ' ') *> itemP (i + 2)) <|> itemP i
-
   return (c : cs)  -- sps2 <- try (count 2 (char ' ')) 
-  -}
+  
+-- >>> doParse (itemP 0) "- A\n- B\n" 
+-- Left (line 1, column 1):
+-- unexpected '-'
+-- expecting end of input
+
+
+cmptP :: Int -> Parser Component 
+cmptP i = undefined
+
+strP :: Int -> Parser String 
+strP i = do 
+  lookAhead eof
+  _ <- try (count i wsp) 
+  s <- try (oneOf "-*+" *> wsp *> many (satisfy (not . isReserved)) <* endOfLine)
+  ss <- strP i 
+  return (s ++ " & " ++ ss)
+
+-- >>> doParse (strP 0) "- A\n- B\n"
+-- Left (line 1, column 1):
+-- unexpected '-'
+-- expecting end of input
+
+
 -- >>> doParse (itemP 0) "- A\n- B"
 -- Left (line 1, column 2):
 -- unexpected " "

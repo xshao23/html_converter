@@ -28,13 +28,13 @@ data Component
   | Plain Statement -- no component-level open/close tags associated
   deriving (Eq, Show)
 
-type Item = [Statement]
+type Item = [Component]
 
-data TaskItem = TI Bool [Statement]
+data TaskItem = TI Bool [Component]
   deriving (Eq, Show)
 
 type Row = [Col] 
-type Col = Statement
+type Col = Component
 
 data DefItem = DI Component [Component]
   deriving (Eq, Show)
@@ -190,7 +190,7 @@ genItem :: Int -> Gen Item
 genItem 0 = pure [] 
 genItem n = QC.frequency [
   (1, return []),
-  (n, (:) <$> genStmt n <*> genStmts (n `div` 2))
+  (n, (:) <$> genCmpt n <*> genCmpts (n `div` 2))
   ]
 
 genItems :: Int -> Gen [Item]
