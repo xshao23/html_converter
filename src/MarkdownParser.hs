@@ -103,8 +103,8 @@ between start end = surround (string start) (string end)
 boldP ::   Parser Statement
 boldP  = Bold <$> (between "**" "**" <|> try (between "__" "__"))
 
-italicsP :: Parser Statement
-italicsP = Italic <$> (single '*' <|> single '_')
+italicP :: Parser Statement
+italicP = Italic <$> (single '*' <|> single '_')
 
 strikethroughP ::Parser Statement 
 strikethroughP = Strikethrough <$> between "~~" "~~"
@@ -124,9 +124,21 @@ supP = Sup <$> single '^'
 --   )
 
 emojiP :: Parser Statement
-emojiP = char ':' *> (Emoji . dropWspOnly <$> some (
-    notFollowedBy (endOfLine *> wsp *> endOfLine)
-    *> satisfy (not . emojiisReserved))) <* char ':'
+emojiP = char ':' *> (
+  Emoji . toUnicode . dropWspOnly <$> some (
+    notFollowedBy (endOfLine *> wsp *> endOfLine) *> satisfy (not . emojiisReserved))
+  ) <* char ':'
+
+toUnicode :: String -> String
+toUnicode "lion" = "129409"
+toUnicode "joy" = "128516"
+toUnicode "devil" = "128520"
+toUnicode "smily" = "128522"
+toUnicode "cool" = "128526"
+toUnicode _ = ""
+
+-- >>> doParse emojiP ":joy:"
+-- Right (Emoji "U+1F603")
 
 single :: Char -> Parser Block
 single ch = surround 
@@ -140,7 +152,7 @@ statementP = notFollowedBy (endOfLine *> wsp *> endOfLine) *> choice [
   --try autoLinkP, 
   try linkP,
   try boldP, 
-  try italicsP, 
+  try italicP, 
   try strikethroughP, 
   try highlightP,
   try subP,
@@ -197,7 +209,6 @@ imageP = (\alt (link, title) -> Image alt link title)
          <$> (string "![" *>  manyTill anyChar (char ']'))
          <*> titleP
 
-
 reserved :: String
 reserved = "*_`)[] <!#\n\\~\\^\\="
 
@@ -206,6 +217,28 @@ isReserved c = c `elem` reserved
 
 emojiisReserved :: Char -> Bool 
 emojiisReserved c = c `elem` (reserved ++ ":")
+
+combineStmts :: Block -> Block
+combineStmts (Block []) = Block []
+combineStmts (Block [x]) = Block [x]
+combineStmts (Block (s1 : s2 : ss)) = case (s1, s2) of
+  (Literal a, Literal b@"\n") -> combineStmts $ Block (Literal (strip a ++ b) : ss)
+  (Literal a, Literal b) -> combineStmts $ combineStr Literal a b ss
+  (Bold b1, Bold b2) -> combineStmts $ combineBlk Bold b1 b2 ss
+  (Italic b1, Italic b2) -> combineStmts $ combineBlk Italic b1 b2 ss
+  (Strikethrough b1, Strikethrough b2) -> combineStmts $ combineBlk Strikethrough b1 b2 ss
+  (Highlight b1, Highlight b2) -> combineStmts $ combineBlk Highlight b1 b2 ss
+  (Sub b1, Sub b2) -> combineStmts $ combineBlk Sub b1 b2 ss
+  (Sup b1, Sup b2) -> combineStmts $ combineBlk Sup b1 b2 ss
+  (Backtick a, Backtick b) -> combineStmts $ combineStr Backtick a b ss
+  (Emoji a, Emoji b) -> combineStmts $ combineStr Emoji a b ss
+  _ -> Block [s1] <> combineStmts (Block (s2 : ss))
+
+combineBlk :: (Block -> Statement) -> Block -> Block -> [Statement] -> Block 
+combineBlk f x y xs = Block (f (combineStmts (x <> y)) : xs)
+
+combineStr :: (String -> Statement) -> String -> String -> [Statement] -> Block 
+combineStr f x y xs = Block (f (x ++ y) : xs)
 
 literalP :: Parser Statement
 literalP = Literal . dropWspOnly <$> some (

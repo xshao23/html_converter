@@ -36,7 +36,7 @@ The author is [Elizabeth Barrett Browning](https://en.wikipedia.org/wiki/Elizabe
 - Yes, call me by my pet-name! let me hear  
 - The name I used to run at, when a child,  
   - From innocent play, and leave the cowslips piled,  
-    - To glance up in some face that proved me dear    
+  - To glance up in some face that proved me dear    
   
 
 + With the look of its eyes. I miss the clear
