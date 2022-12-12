@@ -14,7 +14,7 @@ newtype Markdown = Markdown [Component]
 -- TODO: Only Footnote left
 -- See https://www.markdownguide.org/basic-syntax
 data Component
-  = Heading Header Block (Maybe String) -- <h1> with optional headingID
+  = Heading Header Block
   | Paragraph Block -- <p>
   | Blockquote [Component] -- <blockquote>
   | OrderedList [Item] -- <ol>
@@ -28,13 +28,13 @@ data Component
   | Plain Statement -- no component-level open/close tags associated
   deriving (Eq, Show)
 
-type Item = [Component]
+type Item = [Statement]
 
-data TaskItem = TI Bool [Component]
+data TaskItem = TI Bool [Statement]
   deriving (Eq, Show)
 
 type Row = [Col] 
-type Col = Component
+type Col = Statement
 
 data DefItem = DI Component [Component]
   deriving (Eq, Show)
@@ -117,7 +117,7 @@ genCmpt n =
       (1, return HorizontalRule),
       (1, CodeBlock <$> genStringLit),
       -- generate loops half as frequently as if statements
-      (n, Heading <$> genHeader <*> genBlock n' <*> genMaybe),
+      (n, Heading <$> genHeader <*> genBlock n'),
       (n, Paragraph <$> genBlock n'),
       (n, Blockquote <$> genCmpts n'),
       (n, UnorderedList <$> genItems n'),
@@ -190,7 +190,7 @@ genItem :: Int -> Gen Item
 genItem 0 = pure [] 
 genItem n = QC.frequency [
   (1, return []),
-  (n, (:) <$> genCmpt n <*> genCmpts (n `div` 2))
+  (n, (:) <$> genStmt n <*> genStmts (n `div` 2))
   ]
 
 genItems :: Int -> Gen [Item]

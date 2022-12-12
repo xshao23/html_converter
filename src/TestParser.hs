@@ -12,8 +12,6 @@ import Data.Char qualified as Char
 import Data.Char qualified as P
 import MarkdownParser
 import MarkdownSyntax
-import Parser (Parser)
-import Parser qualified as P
 import Test.HUnit (Assertion, Counts, Test (..), assert, runTestTT, (~:), (~?=))
 import Test.QuickCheck qualified as QC
 

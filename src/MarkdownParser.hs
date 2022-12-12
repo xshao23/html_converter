@@ -3,141 +3,437 @@
 
 module MarkdownParser where 
 
-import Control.Applicative ( Alternative(many) )
-import Data.Char (isNumber)
+import Control.Applicative hiding ((<|>), many, optional)
+import Data.Char (isNumber, isSpace, isAlpha, isAlphaNum)
+import Data.Functor
 import Test.HUnit (Assertion, Counts, Test (..), assert, runTestTT, (~:), (~?=))
 import Test.QuickCheck as QC
+import Data.Set (Set)
+import Control.Monad (guard, when, join)
+import qualified Data.Set as Set (fromList, member)
 
---import Parser (Parser)
---import qualified Parser as P
-
+import qualified System.IO as IO
+import qualified System.IO.Error as IO
+import Debug.Trace
 import Text.Parsec.Char
-import Text.ParserCombinators.Parsec hiding (runParser)
-
+import Text.ParserCombinators.Parsec hiding (runParser, between, parseFromFile)
+import Text.Parsec.Pos
 import MarkdownSyntax
-
+import Text.Parsec.Error (newErrorUnknown)
 
 -- The function below will be called by IOHandler (borrowed from parseLuFile)
 -- Note that Markdown file consists of many components (in parallel)
 -- See MarkdownSyntax line 12
-parseMarkdownFile :: String -> IO (Either P.ParseError Markdown)
-parseMarkdownFile = P.parseFromFile (const <$> markdownP <*> P.eof)
+parseMarkdownFile :: String -> IO (Either ParseError Markdown)
+parseMarkdownFile = parseFromFile (const <$> markdownP <*> eof)
 
--- 下面四个是我看着LuParser加上的，如果后来你发现不需要就删掉吧。
+type ParseError1 = String 
+
+parseFromFile :: Parser a -> String -> IO (Either ParseError a)
+parseFromFile parser filename = do
+  IO.catchIOError
+    (do
+        handle <- IO.openFile filename IO.ReadMode
+        str <- IO.hGetContents handle
+        pure $ doParse parser str)
+    (\e ->
+        pure $ Left $ newErrorUnknown (initialPos "file IO error")
+    )
+
 markdownP :: Parser Markdown 
 markdownP = Markdown <$> many componentP
 
-parseMarkdownCmpt :: String -> Either P.ParseError Component
-parseMarkdownCmpt = P.parse componentP
-
-blockP :: Parser Block
+blockP :: Parser Block 
 blockP = Block <$> many statementP
 
-parseMarkdownStmt :: String -> Either P.ParseError Statement
-parseMarkdownStmt = P.parse statementP
-
 -- | Skip whitespace 
-wsP :: Parser a -> Parser a
--- wsP p = many P.space *> p
-wsP p = p <* many P.space
+-- wsP :: Parser a -> Parser a
+-- -- wsP p = many P.space *> p
+-- wsP p = p <* many P.space
 
-test_wsP :: Test
-test_wsP =
-  TestList
-    [ P.parse (wsP P.alpha) "a" ~?= Right 'a',
-      P.parse (many (wsP P.alpha)) "a b \n   \t c" ~?= Right "abc"
-    ]
+-- test_wsP :: Test
+-- test_wsP =
+--   TestList
+--     [ P.parse (wsP P.alpha) "a" ~?= Right 'a',
+--       P.parse (many (wsP P.alpha)) "a b \n   \t c" ~?= Right "abc"
+--     ]
 
 -- | Parse only a particular string 
-stringP :: String -> Parser ()
-stringP s = wsP $ P.string s *> pure ()
+-- stringP :: String -> Parser ()
+-- stringP s = wsP $ P.string s *> pure ()
 
-test_stringP :: Test
-test_stringP =
-  TestList
-    [ P.parse (stringP "a") "a" ~?= Right (),
-      P.parse (stringP "a") "b" ~?= Left "No parses",
-      P.parse (many (stringP "a")) "a  a"
-        ~?= Right
-          [(), ()]
-    ]
+-- test_stringP :: Test
+-- test_stringP =
+--   TestList
+--     [ P.parse (stringP "a") "a" ~?= Right (),
+--       P.parse (stringP "a") "b" ~?= Left "No parses",
+--       P.parse (many (stringP "a")) "a  a"
+--         ~?= Right
+--           [(), ()]
+--     ]
 -- | Combination string and whitespace parser
-constP :: String -> a -> Parser a
-constP s newVal = stringP s *> pure newVal
+-- constP :: String -> a -> Parser a
+-- constP s newVal = stringP s *> pure newVal
 
-test_constP :: Test
-test_constP =
-  TestList
-    [ P.parse (constP "&" 'a') "&  " ~?= Right 'a',
-      P.parse (many (constP "&" 'a')) "&   &" ~?= Right "aa"
-    ]
+-- test_constP :: Test
+-- test_constP =
+--   TestList
+--     [ P.parse (constP "&" 'a') "&  " ~?= Right 'a',
+--       P.parse (many (constP "&" 'a')) "&   &" ~?= Right "aa"
+--     ]
 
-componentP :: Parser Component
-componentP  = undefined
+strip :: String -> String
+strip [] = []
+strip [' '] = []
+strip (x:xs) = x:strip xs
 
-statementP :: Parser Statement 
-statementP = undefined
+wsp :: Parser String
+wsp = many (char ' ')
 
-itemP :: Parser Item
-itemP = undefined 
+someTill :: Parser a -> Parser end -> Parser [a]
+someTill p end = try ((:[]) <$> p <* end) <|> liftA2 (:) p (someTill p end)
 
-taskItemP :: Parser TaskItem
-taskItemP = undefined
+surround :: Parser start -> Parser end -> Parser Block
+surround start end = start *> (Block <$> someTill statementP (try end))
 
+between ::  String -> String -> Parser Block
+between  start end = surround (string start) (string end)
 
-headerP :: Parser Header
-headerP = undefined
+boldP ::   Parser Statement
+boldP  = Bold <$> (between "**" "**" <|> try (between "__" "__"))
 
-headingP :: Parser Component 
-headingP = undefined 
+italicsP :: Parser Statement
+italicsP = Italic <$> (single '*' <|> single '_')
 
-paragraphP :: Parser Component 
-paragraphP = undefined
+strikethroughP ::Parser Statement 
+strikethroughP = Strikethrough <$> between "~~" "~~"
 
-blockquoteP :: Parser Component 
-blockquoteP = undefined
+highlightP :: Parser Statement 
+highlightP = Highlight <$> between "==" "==" 
 
-orderedListP :: Parser Component 
-orderedListP = undefined
+subP :: Parser Statement 
+subP = Sub <$> single '~'
 
-unorderedListP :: Parser Component 
-unorderedListP = undefined
+supP :: Parser Statement 
+supP = Sup <$> single '^'
 
-codeBlockP :: Parser Component 
-codeBlockP = undefined
-
-horizontalRuleP :: Parser Component 
-horizontalRuleP = undefined
-
-newlineP :: Parser Component 
-newlineP = undefined
-
-plainP :: Parser Component
-plainP = undefined
-
-boldP :: Parser Statement
-boldP = undefined
-
-italicP :: Parser Statement
-italicP = undefined
-
-backtickP :: Parser Statement
-backtickP = undefined
-
-linkP :: Parser Statement
-linkP = undefined
-
-imageP :: Parser Statement 
-imageP = undefined
-
-linebreakP :: Parser Statement 
-linebreakP = undefined
-
-literalP :: Parser Statement
-literalP = undefined
+-- emojiP :: Bool -> Parser Statement
+-- emojiP isPar = Emoji <$> between isPardropWspOnly <$> some (
+--   notFollowedBy (endOfLine *> wsp *> endOfLine) *> satisfy (not . isReserved)
+--   )
 
 emojiP :: Parser Statement
-emojiP = undefined
+emojiP = char ':' *> (Emoji . dropWspOnly <$> some (
+    notFollowedBy (endOfLine *> wsp *> endOfLine)
+    *> satisfy (not . emojiisReserved))) <* char ':'
 
-strikethroughP :: Parser Statement
-strikethroughP = undefined
+single :: Char -> Parser Block
+single ch = surround 
+  (satisfy (==ch)) 
+  (try (lookAhead (notFollowedBy $ between [ch, ch] [ch, ch]) *> satisfy(==ch)))
+
+statementP :: Parser Statement
+statementP = notFollowedBy (endOfLine *> wsp *> endOfLine) *> choice [
+  try backtickP, 
+  try imageP, 
+  try autoLinkP, 
+  try linkP,
+  try boldP, 
+  try italicsP, 
+  try strikethroughP, 
+  try highlightP,
+  try subP,
+  try supP,
+  try lineBreakP,
+  try emojiP,
+  try literalP <|> Literal . (:[]) <$> (try (endOfLine <* wsp) <|> oneOf reserved) 
+  ]
+
+lineBreakP ::  Parser Statement
+lineBreakP  = do
+  try $ string "\\" <|> (count 2 (char ' ') <* many (char ' '))
+  try $ lookAhead $ char '\n' <* many (char ' ') <* satisfy (/= '\n')
+  return LineBreak
+
+backtickP :: Parser Statement
+backtickP = Backtick 
+        <$> (try (string "``" *> p (string "``"))
+        <|> (char '`' *> p (char '`')))
+  where
+    p :: Parser a -> Parser String
+    p = manyTill (notFollowedBy (string "\n\n") >> f <$> anyChar)
+    f x = if x=='\n' then ' ' else x
+
+titleP :: Parser (String, Maybe String)
+titleP = char '(' *> many (char ' ') *> p <* many (char ' ') <* char ')'
+  where              
+    p = (,) <$> destLinkP <*> titleP
+    destLinkP :: Parser String
+    destLinkP = try (char '<' *> manyTill (satisfy (/= '\n')) (char '>')) 
+                <|> many (satisfy (\c -> c /= ' ' && c /= ')' && c /= '\n'))
+    titleP :: Parser (Maybe String)
+    titleP = try (Just <$> (some (char ' ') *> try wrappedTitleP)) <|> Nothing <$ (many (char ' ') *> string "")
+    wrappedTitleP :: Parser String
+    wrappedTitleP = choice [
+      char '"' *> manyTill anyChar  (char '"'),
+      char '\'' *> manyTill anyChar  (char '\''),
+      char '(' *> manyTill anyChar  (char ')')
+      ]
+
+linkP :: Parser Statement
+linkP = (\text (link, title) -> Link text link title)
+    <$> (char '[' *> (Block <$> manyTill statementP' (char ']'))) --(char '[' *> (combineStmts . Block <$> manyTill statementP' (char ']')))
+    <*> titleP
+  where
+    statementP' :: Parser Statement
+    statementP' = try $ do
+                  notFollowedBy autoLinkP
+                  notFollowedBy linkP 
+                  statementP
+
+imageP :: Parser Statement
+imageP = (\alt (link, title) -> Image alt link title)
+         <$> (string "![" *>  manyTill anyChar (char ']'))
+         <*> titleP
+
+
+reserved :: String
+reserved = "*_`)[] <!#\n\\~\\^"
+
+isReserved :: Char -> Bool
+isReserved c = c `elem` reserved
+
+emojiisReserved :: Char -> Bool 
+emojiisReserved c = c `elem` (reserved ++ ":")
+
+literalP :: Parser Statement
+literalP = Literal . dropWspOnly <$> some (
+  notFollowedBy (endOfLine *> wsp *> endOfLine) *> satisfy (not . isReserved)
+  )
+
+dropWspOnly s = reverse (dropS (reverse s)) where
+  dropS ls@(x:xs) = if x == ' ' then dropS xs else ls
+  dropS [] = []
+
+
+autoLinkP :: Parser Statement
+autoLinkP = (\s -> Link (Block [Literal s]) s Nothing) <$> p
+  where
+    p :: Parser String
+    p = char '<' *> ((++) <$> prefixP <*> (notFollowedBy backtickP >> many urlChar <* char '>'))
+    prefixP :: Parser String
+    prefixP = (\a b c -> a:b++[c])
+                <$> satisfy isAlpha
+                <*> some (satisfy (\c -> isAlphaNum c || c == '.' || c == '+' || c == '-'))
+                <*> char ':'
+    urlChar :: Parser Char
+    urlChar = satisfy (`Set.member` whiteList)
+    whiteList :: Set Char
+    whiteList =  Set.fromList ("ABCDEFGHIJKLMNOPQRSTUVWXYZ" 
+                            ++ "abcdefghijklmnopqrstuvwxyz"
+                            ++ "0123456789-._~:/?#[]@!$&'()*+,;=")
+
+doParse :: Parser a -> String -> Either ParseError a
+doParse p = parse p ""
+
+headingP :: Parser Component
+headingP = do
+  sps <- wsp
+  hLevel <- some (char '#') 
+  guard (length hLevel < 7 && not (null hLevel))
+  hText <- some (char ' ') *> blockP
+  return (Heading (getHeader (length hLevel)) hText)
+
+combineStmts :: Block -> Block
+combineStmts (Block []) = Block []
+combineStmts (Block [x]) = Block [x]
+combineStmts (Block (s1 : s2 : ss)) = case (s1, s2) of
+  (Literal a, Literal b@"\n") -> combineStmts $ Block (Literal (strip a ++ b) : ss)
+  (Literal a, Literal b) -> combineStmts $ combineStr Literal a b ss
+  (Bold b1, Bold b2) -> combineStmts $ combineBlk Bold b1 b2 ss
+  (Italic b1, Italic b2) -> combineStmts $ combineBlk Italic b1 b2 ss
+  (Strikethrough b1, Strikethrough b2) -> combineStmts $ combineBlk Strikethrough b1 b2 ss
+  (Highlight b1, Highlight b2) -> combineStmts $ combineBlk Highlight b1 b2 ss
+  (Sub b1, Sub b2) -> combineStmts $ combineBlk Sub b1 b2 ss
+  (Sup b1, Sup b2) -> combineStmts $ combineBlk Sup b1 b2 ss
+  (Backtick a, Backtick b) -> combineStmts $ combineStr Backtick a b ss
+  (Emoji a, Emoji b) -> combineStmts $ combineStr Emoji a b ss
+  _ -> Block [s1] <> combineStmts (Block (s2 : ss))
+
+combineBlk :: (Block -> Statement) -> Block -> Block -> [Statement] -> Block 
+combineBlk f x y xs = Block (f (combineStmts (x <> y)) : xs)
+
+combineStr :: (String -> Statement) -> String -> String -> [Statement] -> Block 
+combineStr f x y xs = Block (f (x ++ y) : xs)
+
+paragraphP :: Parser Component
+paragraphP = Paragraph . combineStmts . Block <$>
+  (try (
+    someTill statementP (
+      try (endOfLine *> endOfLine) <|> lookAhead (endOfLine <* wsp <* lookAhead stopP)
+    )
+  ) <|> some statementP)
+
+stopP :: Parser Component
+stopP = try hrP <|> try headingP  <|> try listP
+
+hrP :: Parser Component
+hrP = wsp *> (hrP' '*' <|> hrP' '-' <|> hrP' '_')
+  where 
+    hrP' :: Char -> Parser Component 
+    hrP' c = do
+      t <- count 3 (char c <* wsp)
+      i <- many (char (head t) <* wsp) *> optionMaybe (satisfy (/='\n'))
+      case i of
+        Just _ -> fail "Unrecognized horizontal rules"
+        Nothing -> return ()
+      return HorizontalRule
+
+plainP :: Parser Component 
+plainP = Plain <$> statementP
+
+
+uiP :: Parser Item
+uiP = do
+  sps <- lookAhead (wsp <* oneOf "-*+")
+  sps2 <- try (wsp *> oneOf "-*+" *> some (char ' '))
+  c <- statementP
+  _ <- many (try (wsp *> endOfLine))
+  -- _ <- trace ("DEBUG: indentation depth" ++ show (length sps + length sps2  +1)) (length sps + length sps2  +1)
+  cs <- many (indentedStmtP (length sps + length sps2 + 1))
+  return (c : cs)
+
+trace2 :: Show a => [Char] -> a -> a
+trace2 name x = trace (name ++ ": " ++ show x) x
+
+indentedStmtP :: Int -> Parser Statement
+indentedStmtP i = do
+  -- _ <- lookAhead (wsp *> noneOf "-*+")
+  sps <- try (count i (char ' '))
+  s <- try statementP
+  _ <- many (try (wsp *> endOfLine))
+  return s
+
+{-
+
+- First 
+- Second 
+  - A 
+  - B
+-}
+
+oiP :: Parser Item
+oiP = do
+  sps <- lookAhead (wsp <* many digit <* char '.')
+  num <- lookAhead (many digit <* char '.')
+  sps2 <- try (wsp *> (many digit <* char '.') *> some (char ' '))
+  c <- statementP
+  _ <- many (try (wsp *> endOfLine))
+  cs <- many (orderedIndentedBlockP (length sps + length sps2 + length num + 1)) 
+  return (c : cs)
+
+orderedIndentedBlockP :: Int -> Parser Statement
+orderedIndentedBlockP i = do
+  _ <- lookAhead (wsp *> notFollowedBy (many digit <* char '.'))
+  indentedStmtP i
+
+parseList :: Parser Component
+parseList = parseOrderedList <|> parseUnorderedList
+  where parseOrderedList :: Parser Component
+        parseOrderedList = many1 orderedListItem Data.Functor.<&> OrderedList
+
+        orderedListItem :: Parser Item
+        orderedListItem = ((many1 digit >> char '.') <* spaces) >> parseInlines
+
+        parseUnorderedList :: Parser Component
+        parseUnorderedList = many1 unorderedListItem Data.Functor.<&> UnorderedList
+
+        unorderedListItem :: Parser Item
+        unorderedListItem = (oneOf "-*+" <* spaces) >> parseInlines
+
+parseInlines :: Parser [Statement]
+parseInlines = manyTill statementP endOfLine
+
+tt = "- A\n- B\n  - C\n  - D\n"
+
+-- >>> doParse parseList tt
+-- Right (UnorderedList [[Literal "A"],[Literal "B"]])
+
+-- >>> doParse unorderedListP tt
+-- Right (UnorderedList [[Literal "A"],[Literal "B",Literal "-"]])
+
+-- >>> doParse listP tt
+-- Right (UnorderedList [[Literal "A"],[Literal "B",Literal "-"]])
+
+{-
+t = UnorderedList [
+    [Paragraph (Block [Literal "hello world!",LineBreak])],
+    [
+      Paragraph (Block [Literal "unordered",LineBreak]),
+      UnorderedList [
+        [
+          Paragraph (Block [Literal "first item",LineBreak]),
+          UnorderedList [[Paragraph (Block [Literal "second item\n"])]]
+          ]
+        ]
+      ]
+    ]
+
+tCorrect = UnorderedList [
+    [Paragraph (Block [Literal "hello world!",LineBreak])],
+    [
+      Paragraph (Block [Literal "unordered",LineBreak]),
+      UnorderedList [
+        [Paragraph (Block [Literal "first item",LineBreak])],
+        [Paragraph (Block [Literal "second item\n"])]
+      ]
+    ]
+  ]
+  -}
+
+listP :: Parser Component
+listP = unorderedListP <|> orderedListP
+
+unorderedListP :: Parser Component
+unorderedListP = do
+  items <- some (try uiP) -- [Block]
+  return (UnorderedList items)
+
+orderedListP :: Parser Component
+orderedListP = do
+  start <- lookAhead (many digit <* char '.')
+  items <- some (try oiP)
+  return (OrderedList items)
+
+componentP :: Parser Component
+componentP = (
+  try hrP 
+  <|> try headingP 
+  <|> try listP 
+  <|> try paragraphP
+  ) <* optional (many endOfLine)
+
+
+-- | pass in previous level depth
+{- 
+itemP :: Int -> Parser Item
+itemP i = do 
+  sps <- try (wsp <* oneOf "-*+") 
+  _ <- try (oneOf "-*+" *> some (char ' ')) -- keep 
+  c <- try componentP
+  _ <- many (try (wsp *> endOfLine))
+  cs <- try (count 2 (char ' ') *> itemP (i + 2)) <|> itemP i
+
+  return (c : cs)  -- sps2 <- try (count 2 (char ' ')) 
+  -}
+-- >>> doParse (itemP 0) "- A\n- B"
+-- Left (line 1, column 2):
+-- unexpected " "
+
+{-
+- A 
+- B 
+  - C 
+  - D 
+-}
+

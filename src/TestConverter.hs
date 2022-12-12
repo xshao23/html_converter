@@ -15,7 +15,6 @@ import HtmlConverter
       tTestLineBreak,
       tTestLiteral,
       tTestHeading,
-      tTestHeadingID,
       tTestParagraph,
       tTestBlockquote,
       tTestOrderedList,
@@ -66,7 +65,6 @@ tStmtTest = "Statement test" ~: TestList [
 tCmptTest :: Test 
 tCmptTest = "Component test" ~: TestList [
   tTestHeading,
-  tTestHeadingID,
   tTestParagraph,
   tTestBlockquote,
   tTestOrderedList,

@@ -76,7 +76,7 @@ render ss = Element "html" [] [Element "body" [] ss]
 
 -- Part 2 : Convert each component of the Markdown to a SimpleHTML
 convCmpt :: Component -> SimpleHTML String
-convCmpt (Heading h b hid) = Element (show h) (addAttris [("id", hid)]) (convBlock b)
+convCmpt (Heading h b) = Element (show h) [] (convBlock b)
 convCmpt (Paragraph b) = Element "p" [] (convBlock b) 
 convCmpt (Blockquote cs) = Element "blockquote" [] (map convCmpt cs)
 convCmpt (OrderedList ol) = Element "ol" [] (map convItem ol)
@@ -227,23 +227,13 @@ tTestLiteral =
 tTestHeading :: Test
 tTestHeading = 
   convCmpt (
-    Heading H1 (Block [Literal "H1 Heading", LineBreak, Literal "Continues"]) Nothing
+    Heading H1 (Block [Literal "H1 Heading", LineBreak, Literal "Continues"])
     ) ~?= Element "h1" [] [
       PCDATA "H1 Heading", 
       Element "br" [] [], 
       PCDATA "Continues"
       ]
       --["<h1>", "H1 Heading", "<br>", "Continues", "</h1>"] 
-
-tTestHeadingID :: Test 
-tTestHeadingID = 
-  convCmpt (
-    Heading H1 (Block [Literal "H1 Heading", LineBreak, Literal "Continues"]) (Just "heading1")
-    ) ~?= Element "h1" [("id", "heading1")] [
-      PCDATA "H1 Heading", 
-      Element "br" [] [], 
-      PCDATA "Continues"
-      ]
 
 tTestParagraph :: Test
 tTestParagraph = 
@@ -321,11 +311,11 @@ tTestOrderedList = convCmpt testOrderedList ~?= expectedOrderedList
 testUnorderedList :: Component 
 testUnorderedList = UnorderedList [
   [
-    Heading H4 (Block [Literal "H4 Heading"]) Nothing, 
+    Heading H4 (Block [Literal "H4 Heading"]), 
     Paragraph (Block [Literal "I love Haskell"])
   ],
   [
-    Heading H5 (Block [Literal "H5 Heading"]) Nothing, 
+    Heading H5 (Block [Literal "H5 Heading"]), 
     Paragraph (Block [Literal "and FP in general"])
   ] 
   ]
@@ -477,7 +467,7 @@ tTestPlain =
 -- Unit tests of Markdown
 test1 :: Markdown
 test1 = Markdown [
-  Heading H1 (Block [Literal "Test Example 1"]) Nothing,
+  Heading H1 (Block [Literal "Test Example 1"]),
   Newline,
   HorizontalRule, 
   Newline,
@@ -519,8 +509,8 @@ tTest1 = convert test1 ~?= expected1
 
 test2 :: Markdown 
 test2 = Markdown [
-  Heading H1 (Block [Literal "H1 Heading"]) (Just "heading1"),
-  Heading H3 (Block [Literal "H3 Heading"]) (Just "heading3"),
+  Heading H1 (Block [Literal "H1 Heading"]),
+  Heading H3 (Block [Literal "H3 Heading"]),
   Paragraph (Block [
     Italic (Block [Literal "Italicized test"]),
     Bold (Block [Literal "Love is bold"]),
@@ -534,8 +524,8 @@ test2 = Markdown [
 expected2 :: SimpleHTML String
 expected2 = 
   render [
-    Element "h1" [("id", "heading1")] [PCDATA "H1 Heading"],
-    Element "h3" [("id", "heading3")] [PCDATA "H3 Heading"],
+    Element "h1" [] [PCDATA "H1 Heading"],
+    Element "h3" [] [PCDATA "H3 Heading"],
     Element "p" [] [
       Element "em" [] [PCDATA "Italicized test"],
       Element "strong" [] [PCDATA "Love is bold"],
@@ -552,7 +542,7 @@ tTest2 = convert test2 ~?= expected2
 
 test3 :: Markdown 
 test3 = Markdown [
-  Heading H5 (Block [Literal "H5 Heading"]) Nothing,
+  Heading H5 (Block [Literal "H5 Heading"]),
   CodeBlock "getDate()"
   ]
 expected3 :: SimpleHTML String
