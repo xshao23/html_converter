@@ -273,6 +273,34 @@ hrP = wsp *> (hrP' '*' <|> hrP' '-' <|> hrP' '_')
 plainP :: Parser Component 
 plainP = Plain <$> statementP
 
+indentedCmptP :: Int -> Parser Component
+indentedCmptP i = do
+  -- _ <- lookAhead (wsp *> noneOf "-*+")
+  sps <- try (count i (char ' '))
+  s <- try componentP
+  _ <- many (try (wsp *> endOfLine))
+  return s
+
+{-
+- A
+- B
+  - C 
+  - D
+-}
+
+-- 0 
+-- 2  
+--  "- A\n  - 1\n"
+-- [Component] :: [A, UnorderedList "1" ] 
+
+listP :: Parser Component
+listP = unorderedListP <|> orderedListP
+
+unorderedListP :: Parser Component
+unorderedListP = do 
+  item <- some (try uiP) 
+  -- item <- unorderedItemsP
+  return (UnorderedList item)
 
 uiP :: Parser Item
 uiP = do
@@ -284,40 +312,55 @@ uiP = do
   cs <- many (indentedCmptP (length sps + length sps2 + 1))
   return (c : cs)
 
-trace2 :: Show a => [Char] -> a -> a
-trace2 name x = trace (name ++ ": " ++ show x) x
+-- >>> doParse unorderedItemsP "- A\n- B\n  - C\n  - D\n"
+-- Right [[Paragraph (Block [Literal "A"])],[Paragraph (Block [Literal "B"]),UnorderedList [[Paragraph (Block [Literal "C"]),Paragraph (Block [Literal "D",Literal "\n"])]]]]
 
-indentedCmptP :: Int -> Parser Component
-indentedCmptP i = do
-  -- _ <- lookAhead (wsp *> noneOf "-*+")
-  sps <- try (count i (char ' '))
-  s <- try componentP
-  _ <- many (try (wsp *> endOfLine))
-  return s
+unorderedListP' :: Parser Component
+unorderedListP' = do 
+  li <- many (unorderedItemP 0)
+  traceM $ "li is " ++ show li 
+  if null li 
+    then return (Plain (Literal ""))
+    else return (UnorderedList li)
 
-{-
-
-- A 
-- B
-  - C 
-  - D
--}
+unorderedItemsP :: Parser [Item]
+unorderedItemsP  = many (unorderedItemP 0)
 
 unorderedItemP :: Int -> Parser Item
 unorderedItemP i = do 
-  _ <- try (count i (char ' '))
-  item <- oneOf "-*+" *> wsp *> many (satisfy (not . isReserved)) <* endOfLine 
-  case runParserT (count (i + 2) (char ' ')) of
-    Left _ -> return [Plain (Literal item)]
-    Right _ -> do 
-      uis <- unorderedItemsP (i + 2)
-      return [Plain (Literal item), UnorderedList uis]
+  sp <- manyTill (char ' ') (try (oneOf "+-*"))
+  traceM("sp is " ++ show sp )
+  --guard (length sp == i)
+  _ <- try wsp -- consume white space 
+  c <- componentP <* many (try (wsp *> endOfLine))
+  traceM ("component c is " ++ show c)
+  -- cs <- try (many (unorderedCmptP (i + 2))) -- cs :: [Component] 
+  -- determine if we call unorderedCmptP i `
+  sp' <- lookAhead (manyTill (char ' ') (oneOf "+-*") <|> many endOfLine )  -- Need to handle eol here 
+  traceM ("sp' before guard is " ++ show sp)
+  if length sp' == (i + 2) 
+    then do 
+      cs <- many (unorderedCmptP (i + 2))
+      return $ c : [UnorderedList [cs]]
+    else 
+      return [c]
 
-unorderedItemsP :: Int -> Parser [Item]
-unorderedItemsP i = do 
-  item <- oneOf "-*+" *> wsp *> many (satisfy (not . isReserved)) <* endOfLine 
-  items <- many (unorderedItemP i)
-  return $ [Plain (Literal item)] : items
+unorderedCmptP :: Int -> Parser Component 
+unorderedCmptP i = do 
+  _ <- manyTill (char ' ') (try (oneOf "+-*"))
+  _ <- try wsp -- consume white space 
+  componentP <* many (try (wsp *> endOfLine))
+
+-- >>> doParse (unorderedItemP 0) "- A\n- B\n"
+-- Prelude.undefined
+
+-- >>> doParse (unorderedItemP 0) "- A\n  - B\n  - C\n  - D\n"
+-- Prelude.undefined
+
+
+-- >>> doParse (unorderedItemP 0) "- A\n"
+-- Right [Paragraph (Block [Literal "A",Literal "\n"]),UnorderedList [[]]]
+
 
 -- >>> doParse (unorderedItemP 0) "- A\n- B"
 -- Left (line 2, column 1):
@@ -339,50 +382,8 @@ orderedIndentedBlockP i = do
   _ <- lookAhead (wsp *> notFollowedBy (many digit <* char '.'))
   indentedCmptP i
 
-tt = "- A\n- B\n  - C\n  - D\n"
 
--- >>> doParse parseList tt
--- Right (UnorderedList [[Literal "A"],[Literal "B"]])
 
--- >>> doParse unorderedListP tt
--- Right (UnorderedList [[Literal "A"],[Literal "B",Literal "-"]])
-
--- >>> doParse listP tt
--- Right (UnorderedList [[Literal "A"],[Literal "B",Literal "-"]])
-
-{-
-t = UnorderedList [
-    [Paragraph (Block [Literal "hello world!",LineBreak])],
-    [
-      Paragraph (Block [Literal "unordered",LineBreak]),
-      UnorderedList [
-        [
-          Paragraph (Block [Literal "first item",LineBreak]),
-          UnorderedList [[Paragraph (Block [Literal "second item\n"])]]
-          ]
-        ]
-      ]
-    ]
-
-tCorrect = UnorderedList [
-    [Paragraph (Block [Literal "hello world!",LineBreak])],
-    [
-      Paragraph (Block [Literal "unordered",LineBreak]),
-      UnorderedList [
-        [Paragraph (Block [Literal "first item",LineBreak])],
-        [Paragraph (Block [Literal "second item\n"])]
-      ]
-    ]
-  ]
-  -}
-
-listP :: Parser Component
-listP = unorderedListP <|> orderedListP
-
-unorderedListP :: Parser Component
-unorderedListP = do
-  items <- some (try uiP) -- [Block]
-  return (UnorderedList items)
 
 orderedListP :: Parser Component
 orderedListP = do
@@ -420,14 +421,6 @@ itemP i = do
 
 cmptP :: Int -> Parser Component 
 cmptP i = undefined
-
-strP :: Int -> Parser String 
-strP i = do 
-  lookAhead eof
-  _ <- try (count i wsp) 
-  s <- try (oneOf "-*+" *> wsp *> many (satisfy (not . isReserved)) <* endOfLine)
-  ss <- strP i 
-  return (s ++ " & " ++ ss)
 
 -- >>> doParse (strP 0) "- A\n- B\n"
 -- Left (line 1, column 1):
