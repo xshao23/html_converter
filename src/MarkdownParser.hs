@@ -326,7 +326,7 @@ blockquoteP' = do
 -- Right (Blockquote [Block [Bold (Block [Literal "A"])],Block [Literal "B"]])
 
 listP :: Parser Component 
-listP = ulP
+listP = ulP <|> olP
 
 itemP :: Parser Item 
 itemP = many componentP
@@ -352,6 +352,64 @@ unorderedListP' d lastItem itemList = do
           else do -- length ws = d + 2, next level 
             nested <- unorderedListP (length ws) currItem []
             unorderedListP' (length ws) (lastItem ++ [nested]) itemList
+
+
+olP :: Parser Component 
+olP = orderedListP 0 [] [] 
+
+orderedListP :: Int -> Item -> [Item] -> Parser Component
+orderedListP d lastItem itemList = OrderedList <$> orderedListP' d lastItem itemList
+
+orderedListP' :: Int -> Item -> [Item] -> Parser [Item]
+orderedListP' d lastItem itemList = do 
+  ws <- wsp <* lookAhead (digit <|> oneOf "-*+")
+  if length ws < d -- base case 
+    then return (itemList ++ [lastItem])
+    else do
+      s <- try (some digit *> char '.' *> some (char ' ') *> manyTill anyChar (string "\n"))
+      case doParse itemP s of 
+        Left _ -> return [] 
+        Right currItem -> if length ws == d 
+          then -- same level as the previous line
+            orderedListP' d currItem (if null lastItem then itemList else itemList ++ [lastItem])
+          else do -- length ws = d + 2, next level 
+            nested <- orderedListP (length ws) currItem []
+            orderedListP' (length ws) (lastItem ++ [nested]) itemList
+
+-- >>> doParse (orderedListP 0 [] []) "1. Hello world\n2. B\n  3. C\n  4. D\n    5. E\n      6. F\n***"
+
+oans = OrderedList [
+  [Paragraph (Block [Literal "Hello",Literal " ",Literal "world"])],
+  [Paragraph (Block [Literal "B"]),OrderedList [
+    [Paragraph (Block [Literal "C"])],
+    [Paragraph (Block [Literal "D"]),OrderedList [
+      [Paragraph (Block [Literal "E"]),OrderedList [
+        [Paragraph (Block [Literal "F"])]]]]]]]]
+
+-- >>> doParse olP "1. Hello world\n"
+-- Left (line 2, column 1):
+-- unexpected end of input
+-- expecting " "
+
+otmp :: Parser Statement 
+otmp = do 
+  ws <- wsp <* lookAhead digit 
+  s <- try (some digit *> char '.' *> some (char ' ') *> manyTill anyChar (string "\n"))
+  if length ws == 2 
+    then do
+      return $ Literal s
+    else return $ Literal ("length is " ++ show (length ws))
+
+-- >>> doParse otmp "  1. Hello world\n"
+-- Right (Literal "Hello world")
+
+-- >>> doParse otmp "  1. haha\n"
+-- Right (Literal "haha")
+
+-- >>> doParse ulP "- Hello world\n-"
+-- Left (line 2, column 2):
+-- unexpected end of input
+-- expecting " "
 
 -- >>> doParse ulP "- Hello world\n- B\n  - C\n  - D\n    - E\n      - F\n-"
 -- Right (UnorderedList [[Paragraph (Block [Literal "Hello",Literal " ",Literal "world"])],[Paragraph (Block [Literal "B"]),UnorderedList [[Paragraph (Block [Literal "C"])],[Paragraph (Block [Literal "D"]),UnorderedList [[Paragraph (Block [Literal "E"]),UnorderedList [[Paragraph (Block [Literal "F"])]]]]]]]])
