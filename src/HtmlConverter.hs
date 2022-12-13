@@ -84,10 +84,29 @@ convCmpt (UnorderedList ul) = Element "ul" [] (map convItem ul)
 convCmpt (TaskList ti) = Element "ul" [] (map convTaskItem ti)
 convCmpt (Table tr) = Element "table" [] (map convRow tr)
 convCmpt (DefinitionList dl) = Element "dl" [] (concatMap convDefItem dl)
-convCmpt (CodeBlock s) = Element "code" [] [PCDATA s]
+convCmpt (CodeBlock b) = convCodeBlk b
 convCmpt HorizontalRule = Element "hr" [] [] 
 convCmpt Newline = Element "br" [] []
 convCmpt (Plain s) = convStmt s
+
+convCodeBlk :: Block -> SimpleHTML String 
+convCodeBlk (Block []) = E 
+convCodeBlk (Block [s]) = convStmt s
+convCodeBlk (Block ss) = Element "code" [] tmp
+  where 
+    tmp :: [SimpleHTML String]
+    tmp = foldr (\s acc -> if null acc 
+      then convStmt s : acc
+      else convStmt s : Element "br" [] [] : acc) [] ss 
+
+-- >>> convCmpt (CodeBlock (Block [Literal "abc ",Literal " def()"]))
+-- Element "code" [] [PCDATA "abc&nbsp;",Element "br" [] [],PCDATA "&nbsp;def()"]
+
+-- >>> html2string $ convCmpt (CodeBlock (Block [Literal "abc ",Literal " def()"]))
+-- "<code>abc&nbsp;<br/>&nbsp;def()<br/></code>"
+
+-- >>> html2string $ convCmpt (Heading H1 (Block [Literal "H1",Literal " ",Literal "\n",Literal "Heading"]))
+-- "<h1>H1&nbsp;<br/>Heading</h1>"
 
 convItem :: Item -> SimpleHTML String 
 convItem item = Element "li" [] (map convCmpt item) 
@@ -112,8 +131,15 @@ convDefItem (DI c cs) = Element "dt" [] [convCmpt c] : getDefs cs
 convBlock :: Block -> [SimpleHTML String]
 convBlock (Block ss) = map convStmt ss
 
+convLiteral :: String -> String 
+convLiteral = foldr (\c acc -> convChar c ++ acc) []
+
+convChar :: Char -> String
+convChar ' ' = "&nbsp;"
+convChar c = [c]
+
 convStmt :: Statement -> SimpleHTML String
-convStmt (Literal s) = PCDATA s  
+convStmt (Literal s) = PCDATA (convLiteral s)  
 convStmt LineBreak = Element "br" [] []
 convStmt (Emoji s) = PCDATA ("&#" ++ s ++ ";") 
 convStmt (Backtick s) = Element "code" [] [PCDATA s] 
@@ -274,9 +300,9 @@ testOrderedList :: Component
 testOrderedList = OrderedList [
   [Plain (Literal "first line")], 
   [Plain (Literal "methods: "), UnorderedList [
-      [CodeBlock "getDate()"],
-      [CodeBlock "getTime()"],
-      [CodeBlock "getMinutes()"]
+      [CodeBlock (Block [Literal "getDate()"])],
+      [CodeBlock (Block [Literal "getTime()"])],
+      [CodeBlock (Block [Literal "getMinutes()"])]
       ]
     ]
   ]
@@ -453,7 +479,7 @@ tTestDefinitionList = convCmpt testDefinitionList ~?= expectedDefinitionList
 
 tTestCodeBlock :: Test
 tTestCodeBlock = 
-  convCmpt (CodeBlock "a + b = c") ~?= 
+  convCmpt (CodeBlock (Block [Literal "a + b = c"])) ~?= 
     Element "code" [] [PCDATA "a + b = c"] --["<code>", "a + b = c", "</code>"]
 
 tTestHorinzontalRule :: Test
@@ -543,7 +569,7 @@ tTest2 = convert test2 ~?= expected2
 test3 :: Markdown 
 test3 = Markdown [
   Heading H5 (Block [Literal "H5 Heading"]),
-  CodeBlock "getDate()"
+  CodeBlock (Block [Literal "getDate()"])
   ]
 expected3 :: SimpleHTML String
 expected3 = render [Element "h5" [] [PCDATA  "H5 Heading"], Element "code" [] [PCDATA "getDate()"]]

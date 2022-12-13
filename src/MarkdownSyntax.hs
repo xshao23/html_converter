@@ -22,7 +22,7 @@ data Component
   | TaskList [TaskItem] -- <ul class="checked">
   | Table [Row]
   | DefinitionList [DefItem]
-  | CodeBlock String -- <code>
+  | CodeBlock Block -- <code>
   | HorizontalRule -- <hr/>
   | Newline -- <br/>
   | Plain Statement -- no component-level open/close tags associated
@@ -108,14 +108,12 @@ genStringLit = escape <$> QC.listOf (QC.elements stringLitChars)
 genCmpt :: Int -> Gen Component
 genCmpt n | n <= 1 = QC.oneof [
   return Newline, 
-  return HorizontalRule, 
-  CodeBlock <$> genStringLit
+  return HorizontalRule
   ]
 genCmpt n =
   QC.frequency
     [ (1, return Newline),
       (1, return HorizontalRule),
-      (1, CodeBlock <$> genStringLit),
       -- generate loops half as frequently as if statements
       (n, Heading <$> genHeader <*> genBlock n'),
       (n, Paragraph <$> genBlock n'),
@@ -125,6 +123,7 @@ genCmpt n =
       (n, TaskList <$> genTaskItems n'),
       (n, Table <$> genRows n'),
       (n, DefinitionList <$> genDefItems n'),
+      (n, CodeBlock <$> genBlock n'),
       (n, Plain <$> genStmt n')
     ]
   where

@@ -5,6 +5,7 @@ module MarkdownParser where
 
 import Control.Applicative hiding ((<|>), many, optional)
 import Data.Char (isNumber, isSpace, isAlpha, isAlphaNum)
+import Data.List.Split hiding (oneOf)
 import Data.Functor
 import Test.HUnit (Assertion, Counts, Test (..), assert, runTestTT, (~:), (~?=))
 import Test.QuickCheck as QC
@@ -47,42 +48,6 @@ markdownP = Markdown <$> many componentP
 blockP :: Parser Block 
 blockP = Block <$> many statementP
 
--- | Skip whitespace 
--- wsP :: Parser a -> Parser a
--- -- wsP p = many P.space *> p
--- wsP p = p <* many P.space
-
--- test_wsP :: Test
--- test_wsP =
---   TestList
---     [ P.parse (wsP P.alpha) "a" ~?= Right 'a',
---       P.parse (many (wsP P.alpha)) "a b \n   \t c" ~?= Right "abc"
---     ]
-
--- | Parse only a particular string 
--- stringP :: String -> Parser ()
--- stringP s = wsP $ P.string s *> pure ()
-
--- test_stringP :: Test
--- test_stringP =
---   TestList
---     [ P.parse (stringP "a") "a" ~?= Right (),
---       P.parse (stringP "a") "b" ~?= Left "No parses",
---       P.parse (many (stringP "a")) "a  a"
---         ~?= Right
---           [(), ()]
---     ]
--- | Combination string and whitespace parser
--- constP :: String -> a -> Parser a
--- constP s newVal = stringP s *> pure newVal
-
--- test_constP :: Test
--- test_constP =
---   TestList
---     [ P.parse (constP "&" 'a') "&  " ~?= Right 'a',
---       P.parse (many (constP "&" 'a')) "&   &" ~?= Right "aa"
---     ]
-
 strip :: String -> String
 strip [] = []
 strip [' '] = []
@@ -111,17 +76,36 @@ strikethroughP = Strikethrough <$> between "~~" "~~"
 
 highlightP :: Parser Statement 
 highlightP = Highlight <$> between "==" "==" 
+{-
+char' :: Char -> Parser Char
+char' c = satisfy (c ==)
+
+betweenS :: Parser open -> Parser a -> Parser close -> Parser a
+betweenS open p close = open *> p <* close
+
+stringValP :: Parser String
+stringValP = some anyChar
+
+stringP :: String -> Parser ()
+stringP s = string s *> many space *> pure ()
+
+blks :: Parser a -> Parser a
+blks x = betweenS (string "```") x (string "```")
+
+cP :: Parser Component 
+cP = CodeBlock <$> blks stringValP
+-}
+-- >>> doParse cP "``` abc ``` ```"
+-- Left (line 1, column 16):
+-- unexpected end of input
+-- expecting "```"
+
 
 subP :: Parser Statement 
 subP = Sub <$> single '~'
 
 supP :: Parser Statement 
 supP = Sup <$> single '^'
-
--- emojiP :: Bool -> Parser Statement
--- emojiP isPar = Emoji <$> between isPardropWspOnly <$> some (
---   notFollowedBy (endOfLine *> wsp *> endOfLine) *> satisfy (not . isReserved)
---   )
 
 emojiP :: Parser Statement
 emojiP = char ':' *> (
@@ -170,12 +154,32 @@ lineBreakP  = do
 
 backtickP :: Parser Statement
 backtickP = Backtick 
-        <$> (try (string "``" *> p (string "``"))
-        <|> (char '`' *> p (char '`')))
+        <$> try (string "`" *> p (string "`"))
   where
     p :: Parser a -> Parser String
     p = manyTill (notFollowedBy (string "\n\n") >> f <$> anyChar)
-    f x = if x=='\n' then ' ' else x
+    f x = if x =='\n' then ' ' else x
+
+codeblockP :: Parser Component
+codeblockP = do
+      s <- try (string "```\n" *> p (string "```"))
+      return $ CodeBlock (Block (map Literal (splitOn "\n" s) ))
+  where
+    p :: Parser a -> Parser String
+    p = manyTill (notFollowedBy (string "\n\n\n") >> anyChar)
+
+ss = splitOn "\n" "abc \n  def()"
+
+sTest = "```\nabc\ndef()  ```"
+
+-- >>> doParse codeblockP sTest
+-- Right (CodeBlock (Block [Literal "abc",Literal "def()  "]))
+
+-- >>> ss
+-- ["abc ","  def()"]
+
+-- >>> doParse codeblockP "```\nabc  \n   def()```"
+-- Right (CodeBlock (Block [Literal "abc  ",Literal "   def()"]))
 
 titleP :: Parser (String, Maybe String)
 titleP = char '(' *> many (char ' ') *> p <* many (char ' ') <* char ')'
@@ -277,6 +281,11 @@ headingP = do
   guard (length hLevel < 7 && not (null hLevel))
   hText <- some (char ' ') *> blockP
   return (Heading (getHeader (length hLevel)) hText)
+
+-- >>> doParse headingP "# H1  \n Heading"
+-- Right (Heading h1 (Block [Literal "H1",LineBreak,Literal "\n",Literal "Heading"]))
+
+-- >>> doParse headingP "# H1 \n Heading" 
 
 paragraphP :: Parser Component
 paragraphP = Paragraph . Block <$>
@@ -415,9 +424,6 @@ orderedIndentedBlockP i = do
   _ <- lookAhead (wsp *> notFollowedBy (many digit <* char '.'))
   indentedCmptP i
 
-
-
-
 orderedListP :: Parser Component
 orderedListP = do
   start <- lookAhead (many digit <* char '.')
@@ -427,12 +433,12 @@ orderedListP = do
 componentP :: Parser Component
 componentP = (
   try hrP 
+  <|> try codeblockP
   <|> try headingP 
   <|> try listP 
   <|> try paragraphP
   <|> try plainP
   ) <* optional (many endOfLine)
-
 
 -- | pass in previous level depth
 

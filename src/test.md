@@ -55,7 +55,17 @@ The author is [Elizabeth Barrett Browning](https://en.wikipedia.org/wiki/Elizabe
 
 _________________
 
-#### H4 Heading 
+### Code Block
+
+```
+import itertools
+
+def twoSum(self, nums, target):
+  for i, n1 in enumerate(nums[ : -1]):
+    for j in range(i + 1, len(nums)):
+      if n1 + nums[j] == target:
+        return [i, j]
+```
 
 ---
 
