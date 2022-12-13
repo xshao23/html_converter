@@ -325,14 +325,11 @@ blockquoteP' = do
 -- >>> doParse blockquoteP "> **A**\n> B\n"
 -- Right (Blockquote [Block [Bold (Block [Literal "A"])],Block [Literal "B"]])
 
+listP :: Parser Component 
+listP = ulP
+
 itemP :: Parser Item 
 itemP = many componentP
-{-
-unorderedListP :: Parser Component 
-unorderedListP = do 
-  is <- some (unorderedListP' 0)
-  return (UnorderedList is)
--}
 
 ulP :: Parser Component 
 ulP = unorderedListP 0 [] []
@@ -343,38 +340,23 @@ unorderedListP d lastItem itemList = UnorderedList <$> unorderedListP' d lastIte
 unorderedListP' :: Int -> Item -> [Item] -> Parser [Item]
 unorderedListP' d lastItem itemList = do 
   ws <- wsp <* lookAhead (oneOf "-*+")
-  -- base case 
-  if length ws < d
-    then {-let 
-      finalItem = last itemList
-      finalItem1 = last finalItem in
-      case finalItem1 of 
-        (UnorderedList is) -> let
-          newIs = UnorderedList (is ++ [lastItem])
-          newFinalItem = init finalItem ++ [newIs] 
-          r = init itemList ++ [newFinalItem] in
-            return r
-        _ -> return [[Plain (Block [Literal ("length ws " ++ show (length ws) ++ " & d is " ++ show d)])]]
-      -}
-      return (itemList ++ [lastItem])
-    else 
-      if length ws == d 
-        then do 
-          s <- try (oneOf "-*+" *> some (char ' ') *> manyTill alphaNum (string "\n"))
-          case doParse itemP s of 
-            Left _ -> return [[Plain (Block [Literal ("line 364 " ++ "length ws " ++ show (length ws) ++ " & d is " ++ show d)])]]
-            Right currItem -> unorderedListP' d currItem (if null lastItem then itemList else itemList ++ [lastItem])
-        else do -- d + 2 = length ws
-          s <- try (oneOf "-*+" *> some (char ' ') *> manyTill alphaNum (string "\n")) 
-          case doParse itemP s of 
-            Left _ -> return [[Plain (Block [Literal ("line 369 " ++ "length ws " ++ show (length ws) ++ " & d is " ++ show d)])]]
-            Right currItem ->
-              do 
-                nested <- unorderedListP (length ws) currItem []
-                unorderedListP' (length ws) (lastItem ++ [nested]) itemList
+  if length ws < d -- base case 
+    then return (itemList ++ [lastItem])
+    else do
+      s <- try (oneOf "-*+" *> some (char ' ') *> manyTill anyChar (string "\n"))
+      case doParse itemP s of 
+        Left _ -> return [] 
+        Right currItem -> if length ws == d 
+          then -- same level as the previous line
+            unorderedListP' d currItem (if null lastItem then itemList else itemList ++ [lastItem])
+          else do -- length ws = d + 2, next level 
+            nested <- unorderedListP (length ws) currItem []
+            unorderedListP' (length ws) (lastItem ++ [nested]) itemList
 
--- >>> doParse ulP "- A\n- B\n  - C\n  - D\n    - E\n      - F\n-"
--- Right (
+-- >>> doParse ulP "- Hello world\n- B\n  - C\n  - D\n    - E\n      - F\n-"
+-- Right (UnorderedList [[Paragraph (Block [Literal "Hello",Literal " ",Literal "world"])],[Paragraph (Block [Literal "B"]),UnorderedList [[Paragraph (Block [Literal "C"])],[Paragraph (Block [Literal "D"]),UnorderedList [[Paragraph (Block [Literal "E"]),UnorderedList [[Paragraph (Block [Literal "F"])]]]]]]]])
+
+ans3' = UnorderedList [[Paragraph (Block [Literal "A"])],[Paragraph (Block [Literal "B"]),UnorderedList [[Paragraph (Block [Literal "C"])],[Paragraph (Block [Literal "D"]),UnorderedList [[Paragraph (Block [Literal "E"]),UnorderedList [[Paragraph (Block [Literal "F"])]]]]]]]]
   
 ans3 = UnorderedList [
   [Paragraph (Block [Literal "A"])],
@@ -384,6 +366,8 @@ ans3 = UnorderedList [
       [Paragraph (Block [Literal "E"]),UnorderedList [
         [Paragraph (Block [Literal "F"])]]]]]]]]
 
+-- >>> ans3 == ans3'
+-- True
 
 -- >>> doParse ulP "- A\n- B\n  - C\n  - D\n-"
 -- Right (
@@ -404,27 +388,6 @@ ans = UnorderedList [
     ]]
   ]
 
-ex :: Component 
-ex = UnorderedList [
-  [Paragraph (Block [Literal "A"])],
-  [Paragraph (Block [Literal "B"]), UnorderedList [
-    [Paragraph (Block [Literal "C"])]
-  ]]
-
-  ]
-{-
-- A
-- B
-  - C
-  - D 
-   -
--}
-
-l = [[1,2], [3,4]]
-
--- >>> l !! (length l - 1)
--- [3,4]
-
 tmp :: Parser Statement 
 tmp = do 
   ws <- wsp <* lookAhead alphaNum
@@ -436,15 +399,6 @@ tmp = do
 
 -- >>> doParse tmp " hello\n"
 -- Right (Literal "length is 1")
-
--- >>> doParse unorderedListP "- This is love \n- Yep, it is \n"
--- Right (UnorderedList [[Plain (Block [Literal "This",Literal " ",Literal "is",Literal " ",Literal "love",Literal " "])],[Plain (Block [Literal "Yep,",Literal " ",Literal "it",Literal " ",Literal "is",Literal " "])]])
-
--- >>> doParse componentP "This is love"
--- Right (Paragraph (Block [Literal "This",Literal " ",Literal "is",Literal " ",Literal "love"]))
-
-listP :: Parser Component 
-listP = ulP
 
 stopP :: Parser Component
 stopP = try hrP <|> try headingP <|> try listP
@@ -462,130 +416,6 @@ hrP = wsp *> (hrP' '*' <|> hrP' '-' <|> hrP' '_')
         Nothing -> return ()
         -}
       return HorizontalRule
-
--- >>> doParse paragraphP "This is love"
--- Right (Paragraph (Block [Literal "This",Literal " ",Literal "is",Literal " ",Literal "love"]))
-
--- >>> doParse plainP "This is love"
--- Right (Plain (Block [Literal "This",Literal " ",Literal "is",Literal " ",Literal "love"]))
-
-{-
-indentedCmptP :: Int -> Parser Component
-indentedCmptP i = do
-  -- _ <- lookAhead (wsp *> noneOf "-*+")
-  sps <- try (count i (char ' '))
-  s <- try componentP
-  _ <- many (try (wsp *> endOfLine))
-  return s
-
-
-- A
-- B
-  - C 
-  - D
--}
-
--- 0 
--- 2  
---  "- A\n  - 1\n"
--- [Component] :: [A, UnorderedList "1" ] 
-
-{-
-listP :: Parser Component
-listP = unorderedListP <|> orderedListP
-
-unorderedListP :: Parser Component
-unorderedListP = do 
-  item <- some (try uiP) 
-  -- item <- unorderedItemsP
-  return (UnorderedList item)
-
-uiP :: Parser Item
-uiP = do
-  sps <- lookAhead (wsp <* oneOf "-*+")
-  sps2 <- try (wsp *> oneOf "-*+" *> some (char ' '))
-  c <- componentP
-  _ <- many (try (wsp *> endOfLine))
-  -- _ <- trace ("DEBUG: indentation depth" ++ show (length sps + length sps2  +1)) (length sps + length sps2  +1)
-  cs <- many (indentedCmptP (length sps + length sps2 + 1))
-  return (c : cs)
-
--- >>> doParse unorderedItemsP "- A\n- B\n  - C\n  - D\n"
--- Right [[Paragraph (Block [Literal "A"])],[Paragraph (Block [Literal "B"]),UnorderedList [[Paragraph (Block [Literal "C"]),Paragraph (Block [Literal "D",Literal "\n"])]]]]
-
-unorderedListP' :: Parser Component
-unorderedListP' = do 
-  li <- many (unorderedItemP 0)
-  traceM $ "li is " ++ show li 
-  if null li 
-    then return (Plain (Literal ""))
-    else return (UnorderedList li)
-
-unorderedItemsP :: Parser [Item]
-unorderedItemsP  = many (unorderedItemP 0)
-
-unorderedItemP :: Int -> Parser Item
-unorderedItemP i = do 
-  sp <- manyTill (char ' ') (try (oneOf "+-*"))
-  traceM("sp is " ++ show sp )
-  --guard (length sp == i)
-  _ <- try wsp -- consume white space 
-  c <- componentP <* many (try (wsp *> endOfLine))
-  traceM ("component c is " ++ show c)
-  -- cs <- try (many (unorderedCmptP (i + 2))) -- cs :: [Component] 
-  -- determine if we call unorderedCmptP i `
-  sp' <- lookAhead (manyTill (char ' ') (oneOf "+-*") <|> many endOfLine )  -- Need to handle eol here 
-  traceM ("sp' before guard is " ++ show sp)
-  if length sp' == (i + 2) 
-    then do 
-      cs <- many (unorderedCmptP (i + 2))
-      return $ c : [UnorderedList [cs]]
-    else 
-      return [c]
-
-unorderedCmptP :: Int -> Parser Component 
-unorderedCmptP i = do 
-  _ <- manyTill (char ' ') (try (oneOf "+-*"))
-  _ <- try wsp -- consume white space 
-  componentP <* many (try (wsp *> endOfLine))
-
--- >>> doParse (unorderedItemP 0) "- A\n- B\n"
--- Prelude.undefined
-
--- >>> doParse (unorderedItemP 0) "- A\n  - B\n  - C\n  - D\n"
--- Prelude.undefined
-
-
--- >>> doParse (unorderedItemP 0) "- A\n"
--- Right [Paragraph (Block [Literal "A",Literal "\n"]),UnorderedList [[]]]
-
-
--- >>> doParse (unorderedItemP 0) "- A\n- B"
--- Left (line 2, column 1):
--- unexpected "-"
--- expecting " "
-
-oiP :: Parser Item
-oiP = do
-  sps <- lookAhead (wsp <* many digit <* char '.')
-  num <- lookAhead (many digit <* char '.')
-  sps2 <- try (wsp *> (many digit <* char '.') *> some (char ' '))
-  c <- componentP
-  _ <- many (try (wsp *> endOfLine))
-  cs <- many (orderedIndentedBlockP (length sps + length sps2 + length num + 1)) 
-  return (c : cs)
-
-orderedIndentedBlockP :: Int -> Parser Component
-orderedIndentedBlockP i = do
-  _ <- lookAhead (wsp *> notFollowedBy (many digit <* char '.'))
-  indentedCmptP i
-
-orderedListP :: Parser Component
-orderedListP = do
-  start <- lookAhead (many digit <* char '.')
-  items <- some (try oiP)
-  return (OrderedList items)
--}
 
 componentP :: Parser Component
 componentP = (
