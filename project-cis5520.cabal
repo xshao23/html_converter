@@ -26,6 +26,7 @@ common common-stanza
     , QuickCheck
     , containers
     , parsec >= 3.1.14.0
+    , split >= 0.2.3.5
     , filepath
     , pretty
     , network
