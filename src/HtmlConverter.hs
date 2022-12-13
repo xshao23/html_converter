@@ -78,7 +78,7 @@ render ss = Element "html" [] [Element "body" [] ss]
 convCmpt :: Component -> SimpleHTML String
 convCmpt (Heading h b) = Element (show h) [] (convBlock b)
 convCmpt (Paragraph b) = Element "p" [] (convBlock b) 
-convCmpt (Blockquote cs) = Element "blockquote" [] (map convCmpt cs)
+convCmpt (Blockquote bs) = Element "blockquote" [] (convBlocks bs)
 convCmpt (OrderedList ol) = Element "ol" [] (map convItem ol)
 convCmpt (UnorderedList ul) = Element "ul" [] (map convItem ul)
 convCmpt (TaskList ti) = Element "ul" [] (map convTaskItem ti)
@@ -90,14 +90,23 @@ convCmpt Newline = Element "br" [] []
 convCmpt (Plain s) = convStmt s
 
 convCodeBlk :: Block -> SimpleHTML String 
-convCodeBlk (Block []) = E 
-convCodeBlk (Block [s]) = convStmt s
-convCodeBlk (Block ss) = Element "code" [] tmp
+convCodeBlk (Block ss) = Element "code" [] f
   where 
-    tmp :: [SimpleHTML String]
-    tmp = foldr (\s acc -> if null acc 
-      then convStmt s : acc
-      else convStmt s : Element "br" [] [] : acc) [] ss 
+    f :: [SimpleHTML String]
+    f = foldr (\s acc -> if null acc 
+      then convCodeBlkStmt s : acc
+      else convCodeBlkStmt s : Element "br" [] [] : acc) [] ss 
+
+convCodeBlkStmt :: Statement -> SimpleHTML String 
+convCodeBlkStmt (Literal s) = PCDATA (convLiteral s)
+convCodeBlkStmt _ = E
+
+convLiteral :: String -> String 
+convLiteral = foldr (\c acc -> convChar c ++ acc) []
+
+convChar :: Char -> String
+convChar ' ' = "&nbsp;"
+convChar c = [c]
 
 -- >>> convCmpt (CodeBlock (Block [Literal "abc ",Literal " def()"]))
 -- Element "code" [] [PCDATA "abc&nbsp;",Element "br" [] [],PCDATA "&nbsp;def()"]
@@ -127,19 +136,26 @@ convDefItem (DI c cs) = Element "dt" [] [convCmpt c] : getDefs cs
     getDefs :: [Component] -> [SimpleHTML String]
     getDefs = map (\c -> Element "dd" [] [convCmpt c])
 
+bq =  Blockquote [Block [Bold (Block [Italic (Block [Literal "This",Literal " ",Literal "is",Literal " ",Literal "love"])])],Block [Strikethrough (Block [Literal "Yep,",Literal " ",Literal "it",Literal " ",Literal "is"]),Literal " "]]
+
+
+
+-- >>> html2string (convCmpt bq)
+-- "<blockquote><strong><em>This is love</em></strong><br/><s>Yep, it is</s> </blockquote>"
+
+
 -- Part 3 : Convert each statement within the component to a SimpleHTML
+convBlocks :: [Block] -> [SimpleHTML String]
+convBlocks = foldr (\b acc -> 
+  if null acc 
+    then convBlock b ++ acc 
+    else convBlock b ++ [Element "br" [] []] ++ acc) []
+
 convBlock :: Block -> [SimpleHTML String]
 convBlock (Block ss) = map convStmt ss
 
-convLiteral :: String -> String 
-convLiteral = foldr (\c acc -> convChar c ++ acc) []
-
-convChar :: Char -> String
-convChar ' ' = "&nbsp;"
-convChar c = [c]
-
 convStmt :: Statement -> SimpleHTML String
-convStmt (Literal s) = PCDATA (convLiteral s)  
+convStmt (Literal s) = PCDATA s
 convStmt LineBreak = Element "br" [] []
 convStmt (Emoji s) = PCDATA ("&#" ++ s ++ ";") 
 convStmt (Backtick s) = Element "code" [] [PCDATA s] 
@@ -278,11 +294,11 @@ tTestParagraph =
     
 tTestBlockquote :: Test
 tTestBlockquote = convCmpt (
-  Blockquote [
-    Plain (Literal "I love CIS552"), 
-    Newline, 
-    Plain (Literal "It's the best course!")
-    ]) ~?= Element "blockquote" [] [
+  Blockquote [Block [
+    Literal "I love CIS552", 
+    LineBreak, 
+    Literal "It's the best course!"]]
+    ) ~?= Element "blockquote" [] [
       PCDATA "I love CIS552", 
       Element "br" [] [], 
       PCDATA "It's the best course!"
@@ -295,7 +311,7 @@ tTestBlockquote = convCmpt (
         "</blockquote>"
         ]
   -}
-
+  
 testOrderedList :: Component 
 testOrderedList = OrderedList [
   [Plain (Literal "first line")], 
@@ -479,8 +495,8 @@ tTestDefinitionList = convCmpt testDefinitionList ~?= expectedDefinitionList
 
 tTestCodeBlock :: Test
 tTestCodeBlock = 
-  convCmpt (CodeBlock (Block [Literal "a + b = c"])) ~?= 
-    Element "code" [] [PCDATA "a + b = c"] --["<code>", "a + b = c", "</code>"]
+  convCmpt (CodeBlock (Block [Literal "def()"])) ~?= 
+    Element "code" [] [PCDATA "def()"] --["<code>", "def()", "</code>"]
 
 tTestHorinzontalRule :: Test
 tTestHorinzontalRule = convCmpt HorizontalRule ~?= Element "hr" [] [] --["<hr>"]

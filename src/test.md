@@ -12,6 +12,8 @@ And, as I mused it in his antique tongue,
 I saw, in gradual vision through my tears,  
 ***The sweet, sad years, the melancholy years,***  
 
+:joy:
+
 Those of my own life, who by turns had flung  
 A shadow across me. Straightway I was 'ware,  
 So weeping, how a *mystic Shape* did move  
@@ -20,6 +22,7 @@ And a voice said in mastery, while I strove, --
 `Guess now who holds thee?` -- `Death.` I said. But, there  
 The silver answer rang, -- **`Not Death, but love.`**  
 
+:smily:
 ---
 
 ## Author
@@ -69,7 +72,12 @@ def twoSum(self, nums, target):
 
 ---
 
-##### H5 Heading 
+### Block Quote
+
+> ***How do I love thee? Let me count the ways.***
+> ~~I love thee to the depth and breadth and height~~
+> *My soul can reach, when feeling out of sight*
+> ==For the ends of Being and Ideal Grace.==
 
 ***
 

@@ -143,7 +143,7 @@ statementP = notFollowedBy (endOfLine *> wsp *> endOfLine) *> choice [
   try supP,
   try lineBreakP,
   try emojiP,
-  try literalP <|> Literal . (:[]) <$> (try (endOfLine <* wsp) <|> oneOf reserved) 
+  try literalP <|> Literal . (:[]) <$> (try (endOfLine <* wsp) <|> oneOf reserved)
   ]
 
 lineBreakP ::  Parser Statement
@@ -153,20 +153,12 @@ lineBreakP  = do
   return LineBreak
 
 backtickP :: Parser Statement
-backtickP = Backtick 
-        <$> try (string "`" *> p (string "`"))
-  where
-    p :: Parser a -> Parser String
-    p = manyTill (notFollowedBy (string "\n\n") >> f <$> anyChar)
-    f x = if x =='\n' then ' ' else x
+backtickP = Backtick <$> try (string "`" *> manyTill anyChar (string "`"))
 
 codeblockP :: Parser Component
 codeblockP = do
-      s <- try (string "```\n" *> p (string "```"))
+      s <- try (string "```\n" *> manyTill anyChar (string "```"))
       return $ CodeBlock (Block (map Literal (splitOn "\n" s) ))
-  where
-    p :: Parser a -> Parser String
-    p = manyTill (notFollowedBy (string "\n\n\n") >> anyChar)
 
 ss = splitOn "\n" "abc \n  def()"
 
@@ -282,10 +274,48 @@ headingP = do
   hText <- some (char ' ') *> blockP
   return (Heading (getHeader (length hLevel)) hText)
 
--- >>> doParse headingP "# H1  \n Heading"
--- Right (Heading h1 (Block [Literal "H1",LineBreak,Literal "\n",Literal "Heading"]))
+blockquoteP :: Parser Component 
+blockquoteP = do 
+  ss <- some blockquoteP'
+  return $ Blockquote ss
 
--- >>> doParse headingP "# H1 \n Heading" 
+blockquoteP' :: Parser Block
+blockquoteP' = do
+  s <- try (string "> " *> manyTill anyChar (string "\n"))
+  case doParse blockP s of 
+    Left _ -> return (Block [])
+    Right b -> return b
+  
+-- >>> doParse blockP "This is love"
+-- Right (Block [Literal "This",Literal " ",Literal "is",Literal " ",Literal "love"])
+
+-- >>> doParse blockquoteP' "> This is love\n"
+-- Right (Block [Literal "This",Literal " ",Literal "is",Literal " ",Literal "love"])
+
+-- >>> doParse blockquoteP "> ***This is love***\n> ~~Yep, it is~~ \n"
+-- Right (Blockquote [Block [Bold (Block [Italic (Block [Literal "This",Literal " ",Literal "is",Literal " ",Literal "love"])])],Block [Strikethrough (Block [Literal "Yep,",Literal " ",Literal "it",Literal " ",Literal "is"]),Literal " "]])
+
+
+-- >>> doParse blockquoteP "> **A**\n> B\n"
+-- Right (Blockquote [Block [Bold (Block [Literal "A"])],Block [Literal "B"]])
+
+-- >>> doParse blockquoteP "> How do I love thee? Let me count the ways.  \n> I love thee to the depth and breadth and height  \n"
+-- Right (Blockquote (Block [Literal "How do I love thee? Let me count the ways.  ",Literal "I love thee to the depth and breadth and height  "]))
+
+-- >>> doParse blockquoteP' "> How \n> "
+-- Left (line 1, column 6):
+-- unexpected " "
+-- expecting new-line or "\n"
+
+{-
+codeblockP :: Parser Component
+codeblockP = do
+      s <- try (string "```\n" *> p (string "```"))
+      return $ CodeBlock (Block (map Literal (splitOn "\n" s) ))
+  where
+    p :: Parser a -> Parser String
+    p = manyTill (notFollowedBy (string "\n\n\n") >> anyChar)
+-}
 
 paragraphP :: Parser Component
 paragraphP = Paragraph . Block <$>
@@ -434,6 +464,7 @@ componentP :: Parser Component
 componentP = (
   try hrP 
   <|> try codeblockP
+  <|> try blockquoteP
   <|> try headingP 
   <|> try listP 
   <|> try paragraphP

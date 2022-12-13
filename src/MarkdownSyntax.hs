@@ -16,7 +16,7 @@ newtype Markdown = Markdown [Component]
 data Component
   = Heading Header Block
   | Paragraph Block -- <p>
-  | Blockquote [Component] -- <blockquote>
+  | Blockquote [Block] -- <blockquote>
   | OrderedList [Item] -- <ol>
   | UnorderedList [Item] -- <ul>
   | TaskList [TaskItem] -- <ul class="checked">
@@ -117,7 +117,7 @@ genCmpt n =
       -- generate loops half as frequently as if statements
       (n, Heading <$> genHeader <*> genBlock n'),
       (n, Paragraph <$> genBlock n'),
-      (n, Blockquote <$> genCmpts n'),
+      (n, Blockquote <$> genBlocks n'),
       (n, UnorderedList <$> genItems n'),
       (n, OrderedList <$> genItems n'),
       (n, TaskList <$> genTaskItems n'),
@@ -141,6 +141,13 @@ genCmpts n =
 
 genBlock :: Int -> Gen Block 
 genBlock n = Block <$> genStmts n
+
+genBlocks :: Int -> Gen [Block]
+genBlocks n = QC.frequency [
+  (1, return []),
+  (n, (:) <$> genBlock n' <*> genBlocks n')
+  ]
+  where n' = n `div` 2
 
 genStmt :: Int -> Gen Statement
 genStmt n | n <= 1 = 
