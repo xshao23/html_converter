@@ -1,11 +1,13 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Use $>" #-}
+{-# LANGUAGE BlockArguments #-}
 
 module MarkdownParser where 
 
 import Control.Applicative hiding ((<|>), many, optional)
 import Data.Char (isNumber, isSpace, isAlpha, isAlphaNum)
 import Data.List.Split hiding (oneOf)
+import Data.List
 import Data.Functor
 import Test.HUnit (Assertion, Counts, Test (..), assert, runTestTT, (~:), (~?=))
 import Test.QuickCheck as QC
@@ -274,6 +276,31 @@ headingP = do
   hText <- some (char ' ') *> blockP
   return (Heading (getHeader (length hLevel)) hText)
 
+paragraphP :: Parser Component
+paragraphP = Paragraph <$> paragraphP'
+
+paragraphP' :: Parser Block
+paragraphP' = do
+  s <- try (someTill statementP (try (some endOfLine *> endOfLine) <|> lookAhead (endOfLine <* wsp <* lookAhead stopP))) <|> some statementP
+  return (Block s)
+
+plainP :: Parser Component 
+plainP = Plain <$> plainP'
+
+plainP' :: Parser Block
+plainP' = do
+  b <- try (someTill statementP (lookAhead stopP)) <|> some statementP
+  return (Block b)
+
+-- >>> doParse plainP "This is love  \n\nYes, it is  \n\n"
+-- Right (Plain (Block [Literal "This",Literal " ",Literal "is",Literal " ",Literal "love",Literal " ",Literal " "]))
+
+-- >>> doParse paragraphP "This is love  \n\nYes, it is  \n\n"
+-- Right (Paragraph (Block [Literal "This",Literal " ",Literal "is",Literal " ",Literal "love",Literal " ",Literal " "]))
+
+-- >>> doParse paragraphP "This is love  \n\nYes, it is  \n\n"
+-- Right (Paragraph (Block [Literal "This",Literal " ",Literal "is",Literal " ",Literal "love",Literal " ",Literal " "]))
+
 blockquoteP :: Parser Component 
 blockquoteP = do 
   ss <- some blockquoteP'
@@ -295,35 +322,129 @@ blockquoteP' = do
 -- >>> doParse blockquoteP "> ***This is love***\n> ~~Yep, it is~~ \n"
 -- Right (Blockquote [Block [Bold (Block [Italic (Block [Literal "This",Literal " ",Literal "is",Literal " ",Literal "love"])])],Block [Strikethrough (Block [Literal "Yep,",Literal " ",Literal "it",Literal " ",Literal "is"]),Literal " "]])
 
-
 -- >>> doParse blockquoteP "> **A**\n> B\n"
 -- Right (Blockquote [Block [Bold (Block [Literal "A"])],Block [Literal "B"]])
 
--- >>> doParse blockquoteP "> How do I love thee? Let me count the ways.  \n> I love thee to the depth and breadth and height  \n"
--- Right (Blockquote (Block [Literal "How do I love thee? Let me count the ways.  ",Literal "I love thee to the depth and breadth and height  "]))
-
--- >>> doParse blockquoteP' "> How \n> "
--- Left (line 1, column 6):
--- unexpected " "
--- expecting new-line or "\n"
-
+itemP :: Parser Item 
+itemP = many componentP
 {-
-codeblockP :: Parser Component
-codeblockP = do
-      s <- try (string "```\n" *> p (string "```"))
-      return $ CodeBlock (Block (map Literal (splitOn "\n" s) ))
-  where
-    p :: Parser a -> Parser String
-    p = manyTill (notFollowedBy (string "\n\n\n") >> anyChar)
+unorderedListP :: Parser Component 
+unorderedListP = do 
+  is <- some (unorderedListP' 0)
+  return (UnorderedList is)
 -}
 
-paragraphP :: Parser Component
-paragraphP = Paragraph . Block <$>
-  (try (
-    someTill statementP (
-      try (endOfLine *> endOfLine) <|> lookAhead (endOfLine <* wsp <* lookAhead stopP)
-    )
-  ) <|> some statementP)
+ulP :: Parser Component 
+ulP = unorderedListP 0 [] []
+
+unorderedListP :: Int -> Item -> [Item] -> Parser Component
+unorderedListP d lastItem itemList = UnorderedList <$> unorderedListP' d lastItem itemList
+
+unorderedListP' :: Int -> Item -> [Item] -> Parser [Item]
+unorderedListP' d lastItem itemList = do 
+  ws <- wsp <* lookAhead (oneOf "-*+")
+  -- base case 
+  if length ws < d
+    then {-let 
+      finalItem = last itemList
+      finalItem1 = last finalItem in
+      case finalItem1 of 
+        (UnorderedList is) -> let
+          newIs = UnorderedList (is ++ [lastItem])
+          newFinalItem = init finalItem ++ [newIs] 
+          r = init itemList ++ [newFinalItem] in
+            return r
+        _ -> return [[Plain (Block [Literal ("length ws " ++ show (length ws) ++ " & d is " ++ show d)])]]
+      -}
+      return (itemList ++ [lastItem])
+    else 
+      if length ws == d 
+        then do 
+          s <- try (oneOf "-*+" *> some (char ' ') *> manyTill alphaNum (string "\n"))
+          case doParse itemP s of 
+            Left _ -> return [[Plain (Block [Literal ("line 364 " ++ "length ws " ++ show (length ws) ++ " & d is " ++ show d)])]]
+            Right currItem -> unorderedListP' d currItem (if null lastItem then itemList else itemList ++ [lastItem])
+        else do -- d + 2 = length ws
+          s <- try (oneOf "-*+" *> some (char ' ') *> manyTill alphaNum (string "\n")) 
+          case doParse itemP s of 
+            Left _ -> return [[Plain (Block [Literal ("line 369 " ++ "length ws " ++ show (length ws) ++ " & d is " ++ show d)])]]
+            Right currItem ->
+              do 
+                nested <- unorderedListP (length ws) currItem []
+                unorderedListP' (length ws) (lastItem ++ [nested]) itemList
+
+-- >>> doParse ulP "- A\n- B\n  - C\n  - D\n    - E\n      - F\n-"
+-- Right (
+  
+ans3 = UnorderedList [
+  [Paragraph (Block [Literal "A"])],
+  [Paragraph (Block [Literal "B"]),UnorderedList [
+    [Paragraph (Block [Literal "C"])],
+    [Paragraph (Block [Literal "D"]),UnorderedList [
+      [Paragraph (Block [Literal "E"]),UnorderedList [
+        [Paragraph (Block [Literal "F"])]]]]]]]]
+
+
+-- >>> doParse ulP "- A\n- B\n  - C\n  - D\n-"
+-- Right (
+  
+ans' = UnorderedList [
+  [Paragraph (Block [Literal "A"])],
+  [Paragraph (Block [Literal "B"]),UnorderedList [
+    [Paragraph (Block [Literal "C"])],
+    [Paragraph (Block [Literal "D"])]
+    ]]
+  ]
+  
+ans = UnorderedList [
+    [Paragraph (Block [Literal "A"])],
+    [Paragraph (Block [Literal "B"]),UnorderedList [
+      [Paragraph (Block [Literal "C"])],
+      [Paragraph (Block [Literal "D"])]
+    ]]
+  ]
+
+ex :: Component 
+ex = UnorderedList [
+  [Paragraph (Block [Literal "A"])],
+  [Paragraph (Block [Literal "B"]), UnorderedList [
+    [Paragraph (Block [Literal "C"])]
+  ]]
+
+  ]
+{-
+- A
+- B
+  - C
+  - D 
+   -
+-}
+
+l = [[1,2], [3,4]]
+
+-- >>> l !! (length l - 1)
+-- [3,4]
+
+tmp :: Parser Statement 
+tmp = do 
+  ws <- wsp <* lookAhead alphaNum
+  if length ws == 2 
+    then do
+      s <- manyTill alphaNum (string "\n")
+      return $ Literal s
+    else return $ Literal ("length is " ++ show (length ws))
+
+-- >>> doParse tmp " hello\n"
+-- Right (Literal "length is 1")
+
+-- >>> doParse unorderedListP "- This is love \n- Yep, it is \n"
+-- Right (UnorderedList [[Plain (Block [Literal "This",Literal " ",Literal "is",Literal " ",Literal "love",Literal " "])],[Plain (Block [Literal "Yep,",Literal " ",Literal "it",Literal " ",Literal "is",Literal " "])]])
+
+-- >>> doParse componentP "This is love"
+-- Right (Paragraph (Block [Literal "This",Literal " ",Literal "is",Literal " ",Literal "love"]))
+
+listP :: Parser Component 
+listP = ulP
 
 stopP :: Parser Component
 stopP = try hrP <|> try headingP <|> try listP
@@ -342,9 +463,13 @@ hrP = wsp *> (hrP' '*' <|> hrP' '-' <|> hrP' '_')
         -}
       return HorizontalRule
 
-plainP :: Parser Component 
-plainP = Plain <$> statementP
+-- >>> doParse paragraphP "This is love"
+-- Right (Paragraph (Block [Literal "This",Literal " ",Literal "is",Literal " ",Literal "love"]))
 
+-- >>> doParse plainP "This is love"
+-- Right (Plain (Block [Literal "This",Literal " ",Literal "is",Literal " ",Literal "love"]))
+
+{-
 indentedCmptP :: Int -> Parser Component
 indentedCmptP i = do
   -- _ <- lookAhead (wsp *> noneOf "-*+")
@@ -353,7 +478,7 @@ indentedCmptP i = do
   _ <- many (try (wsp *> endOfLine))
   return s
 
-{-
+
 - A
 - B
   - C 
@@ -365,6 +490,7 @@ indentedCmptP i = do
 --  "- A\n  - 1\n"
 -- [Component] :: [A, UnorderedList "1" ] 
 
+{-
 listP :: Parser Component
 listP = unorderedListP <|> orderedListP
 
@@ -459,6 +585,7 @@ orderedListP = do
   start <- lookAhead (many digit <* char '.')
   items <- some (try oiP)
   return (OrderedList items)
+-}
 
 componentP :: Parser Component
 componentP = (
@@ -470,42 +597,3 @@ componentP = (
   <|> try paragraphP
   <|> try plainP
   ) <* optional (many endOfLine)
-
--- | pass in previous level depth
-
-itemP :: Int -> Parser Item
-itemP i = do 
-  _ <- lookAhead eof
-  _ <- try (count i wsp)
-  _ <- try (oneOf "-*+" *> some (char ' ')) -- keep 
-  c <- try componentP
-  _ <- many (try (wsp *> endOfLine))
-  cs <- try (count 2 (char ' ') *> itemP (i + 2)) <|> itemP i
-  return (c : cs)  -- sps2 <- try (count 2 (char ' ')) 
-  
--- >>> doParse (itemP 0) "- A\n- B\n" 
--- Left (line 1, column 1):
--- unexpected '-'
--- expecting end of input
-
-
-cmptP :: Int -> Parser Component 
-cmptP i = undefined
-
--- >>> doParse (strP 0) "- A\n- B\n"
--- Left (line 1, column 1):
--- unexpected '-'
--- expecting end of input
-
-
--- >>> doParse (itemP 0) "- A\n- B"
--- Left (line 1, column 2):
--- unexpected " "
-
-{-
-- A 
-- B 
-  - C 
-  - D 
--}
-

@@ -24,9 +24,10 @@ test_componentP =
       doParse paragraphP "Hello world."  ~?= Right (Paragraph (Block [Literal "Hello", Literal " ", Literal "world."])),
       --doParse blockquoteP ">I love CIS552>\n>It's the best course!"  ~?= Right (Blockquote [Plain (Literal "I love CIS552"), Newline, Plain (Literal "It's the best course!")]),
       --doParse orderedListP "1. A\n2. B" ~?= Right (OrderedList [[Plain (Literal "first line")], [Plain (Literal "second line")]]),
-      doParse unorderedListP "- A\n- B" ~?= Right (UnorderedList [[Plain (Literal "first line")], [Plain (Literal "second line")]])
+      --doParse unorderedListP "- A\n- B" ~?= Right (UnorderedList [[Plain (Literal "first line")], [Plain (Literal "second line")]])
       --doParse codeBlockP "`getDate()`" ~?= Right (CodeBlock "getDate()") 
       ]
+
 
 -- >>> doParse paragraphP "Hello world."
 -- Right (Paragraph (Block [Literal "Hello",Literal " ",Literal "world."]))

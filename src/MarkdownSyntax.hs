@@ -25,7 +25,7 @@ data Component
   | CodeBlock Block -- <code>
   | HorizontalRule -- <hr/>
   | Newline -- <br/>
-  | Plain Statement -- no component-level open/close tags associated
+  | Plain Block -- no component-level open/close tags associated
   deriving (Eq, Show)
 
 type Item = [Component]
@@ -124,7 +124,7 @@ genCmpt n =
       (n, Table <$> genRows n'),
       (n, DefinitionList <$> genDefItems n'),
       (n, CodeBlock <$> genBlock n'),
-      (n, Plain <$> genStmt n')
+      (n, Plain <$> genBlock n')
     ]
   where
     n' = n `div` 2

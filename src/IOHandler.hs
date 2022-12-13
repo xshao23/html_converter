@@ -5,9 +5,7 @@ import System.Environment ( getArgs, getProgName )
 import HtmlConverter (convertMarkdownContent, error)
 import MarkdownParser (parseMarkdownFile)
 
-
 -- Read in the markdown file, and output the HTML
--- TODO: Should be able to take command line args as file
 
 markdownToHtml :: String -> String -> IO ()
 markdownToHtml src dest = do 

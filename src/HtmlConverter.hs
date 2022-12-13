@@ -84,22 +84,36 @@ convCmpt (UnorderedList ul) = Element "ul" [] (map convItem ul)
 convCmpt (TaskList ti) = Element "ul" [] (map convTaskItem ti)
 convCmpt (Table tr) = Element "table" [] (map convRow tr)
 convCmpt (DefinitionList dl) = Element "dl" [] (concatMap convDefItem dl)
-convCmpt (CodeBlock b) = convCodeBlk b
+convCmpt (CodeBlock b) = convBr "code" b
 convCmpt HorizontalRule = Element "hr" [] [] 
 convCmpt Newline = Element "br" [] []
-convCmpt (Plain s) = convStmt s
+convCmpt (Plain (Block ss)) = 
+  PCDATA $ foldr (\s acc -> f s ++ acc) [] ss 
+  where 
+    f :: Statement -> String 
+    f (Literal s) = s  
+    f _ = ""
 
-convCodeBlk :: Block -> SimpleHTML String 
-convCodeBlk (Block ss) = Element "code" [] f
+-- >>> convCmpt (Plain (Block [Literal "This",Literal " ",Literal "is",Literal " ",Literal "love",Literal " ",Literal " "]))
+-- PCDATA "This is love  "
+
+-- >>> html2string $ convCmpt (Plain (Block [Literal "This",Literal " ",Literal "is",Literal " ",Literal "love",Literal " ",Literal " "]))
+-- "This is love  "
+
+pb = Plain (
+  Block [Literal "This",Literal " ",Literal "is",Literal " ",Literal "love",Literal " ",Literal " "])
+
+convBr :: String -> Block -> SimpleHTML String 
+convBr tag (Block ss) = Element tag [] f
   where 
     f :: [SimpleHTML String]
     f = foldr (\s acc -> if null acc 
-      then convCodeBlkStmt s : acc
-      else convCodeBlkStmt s : Element "br" [] [] : acc) [] ss 
+      then convBrStmt s : acc
+      else convBrStmt s : Element "br" [] [] : acc) [] ss 
 
-convCodeBlkStmt :: Statement -> SimpleHTML String 
-convCodeBlkStmt (Literal s) = PCDATA (convLiteral s)
-convCodeBlkStmt _ = E
+convBrStmt :: Statement -> SimpleHTML String 
+convBrStmt (Literal s) = PCDATA (convLiteral s)
+convBrStmt _ = E
 
 convLiteral :: String -> String 
 convLiteral = foldr (\c acc -> convChar c ++ acc) []
@@ -314,8 +328,8 @@ tTestBlockquote = convCmpt (
   
 testOrderedList :: Component 
 testOrderedList = OrderedList [
-  [Plain (Literal "first line")], 
-  [Plain (Literal "methods: "), UnorderedList [
+  [Plain (Block [Literal "first line"])], 
+  [Plain (Block [Literal "methods: "]), UnorderedList [
       [CodeBlock (Block [Literal "getDate()"])],
       [CodeBlock (Block [Literal "getTime()"])],
       [CodeBlock (Block [Literal "getMinutes()"])]
@@ -385,16 +399,16 @@ tTestUnorderedList = convCmpt testUnorderedList ~?= expectedUnorderedList
 
 testTaskList :: Component 
 testTaskList = TaskList [
-  TI True [Plain (Literal "Pay bills")],
-  TI False [Plain (Literal "Submit assignment")],
-  TI True [Plain (Bold (Block [Literal "Exercise"]))]
+  TI True [Plain (Block [Literal "Pay bills"])],
+  TI False [Plain (Block [Literal "Submit assignment"])],
+  TI True [Plain (Block [Literal "Exercise"])]
   ]
 
 expectedTaskList :: SimpleHTML String
 expectedTaskList = Element "ul" [] [
   Element "li" [("class", "checked")] [PCDATA "Pay bills"],
   Element "li" [] [PCDATA "Submit assignment"],
-  Element "li" [("class", "checked")] [Element "strong" [] [PCDATA "Exercise"]]
+  Element "li" [("class", "checked")] [PCDATA "Exercise"]
   ]
 
 tTestTaskList :: Test 
@@ -403,28 +417,28 @@ tTestTaskList = convCmpt testTaskList ~?= expectedTaskList
 testTable :: Component
 testTable = Table [
   [
-    Plain (Bold (Block [Literal "Company"])), 
-    Plain (Bold (Block [Literal "Contact"])), 
-    Plain (Bold (Block [Literal "Country"]))
+    Plain (Block [Literal "Company"]), 
+    Plain (Block [Literal "Contact"]), 
+    Plain (Block [Literal "Country"])
     ],
   [
-    Plain (Literal "Alfreds Futterkiste"), 
-    Plain (Literal "Maria Anders"), 
-    Plain (Literal "Germany")
+    Plain (Block [Literal "Alfreds Futterkiste"]), 
+    Plain (Block [Literal "Maria Anders"]), 
+    Plain (Block [Literal "Germany"])
     ],
   [
-    Plain (Literal "Centro comercial Moctezuma"), 
-    Plain (Literal "Francisco Chang"), 
-    Plain (Literal "Mexico")
+    Plain (Block [Literal "Centro comercial Moctezuma"]), 
+    Plain (Block [Literal "Francisco Chang"]), 
+    Plain (Block [Literal "Mexico"])
     ]
   ]
 
 expectedTable :: SimpleHTML String 
 expectedTable = Element "table" [] [
   Element "tr" [] [
-    Element "th" [] [Element "strong" [] [PCDATA "Company"]],
-    Element "th" [] [Element "strong" [] [PCDATA "Contact"]],
-    Element "th" [] [Element "strong" [] [PCDATA "Country"]]
+    Element "th" [] [PCDATA "Company"],
+    Element "th" [] [PCDATA "Contact"],
+    Element "th" [] [PCDATA "Country"]
     ],
 
   Element "tr" [] [
@@ -464,12 +478,12 @@ tTestTable = convCmpt testTable ~?= expectedTable
 
 testDefinitionList :: Component 
 testDefinitionList = DefinitionList [
-  DI (Plain (Literal "First Term")) [
-    Plain (Literal "This is the definition of the first term")
+  DI (Plain (Block [Literal "First Term"])) [
+    Plain (Block [Literal "This is the definition of the first term"])
     ], 
-  DI (Plain (Literal "Second Term")) [
-    Plain (Literal "This is the definition of the second term"), 
-    Plain (Literal "This is another definition of the second term")
+  DI (Plain (Block [Literal "Second Term"])) [
+    Plain (Block [Literal "This is the definition of the second term"]), 
+    Plain (Block [Literal "This is another definition of the second term"])
     ]
   ]
 
@@ -503,7 +517,7 @@ tTestHorinzontalRule = convCmpt HorizontalRule ~?= Element "hr" [] [] --["<hr>"]
 
 tTestPlain :: Test
 tTestPlain = 
-  convCmpt (Plain (Literal "This is just a plain text")) ~?= 
+  convCmpt (Plain (Block [Literal "This is just a plain text"])) ~?= 
     PCDATA "This is just a plain text"
 
 -- Unit tests of Markdown
@@ -514,12 +528,12 @@ test1 = Markdown [
   HorizontalRule, 
   Newline,
   UnorderedList [
-    [Plain (Literal "hello, world!")], 
+    [Plain (Block [Literal "hello, world!"])], 
     [
-      Plain (Literal "unordered"), 
+      Plain (Block [Literal "unordered"]), 
       OrderedList [
-        [Plain (Literal "first line")], 
-        [Plain (Literal "second line")]
+        [Plain (Block [Literal "first line"])], 
+        [Plain (Block [Literal "second line"])]
       ]]
     ]
   ]
@@ -660,16 +674,6 @@ prop_DeleteEmptyStmt s = prop_DeleteEmpty (convStmt s)
 prop_DeleteEmptyCmpt :: Component -> Bool
 prop_DeleteEmptyCmpt c = prop_DeleteEmpty (convCmpt c)
 
-prop_DeleteDelete :: SimpleHTML String -> SimpleHTML String -> SimpleHTML String -> Bool 
-prop_DeleteDelete x y h = 
-  delete x (delete y h) == delete y (delete x h)
-
-prop_DeleteDeleteStmt :: Statement -> Statement -> Statement -> Bool 
-prop_DeleteDeleteStmt s1 s2 s = prop_DeleteDelete (convStmt s1) (convStmt s2) (convStmt s)
-
-prop_DeleteDeleteCmpt :: Component -> Component -> Component -> Bool 
-prop_DeleteDeleteCmpt c1 c2 c = prop_DeleteDelete (convCmpt c1) (convCmpt c2) (convCmpt c)
-
 -- Model-based Property 
 prop_InsertModel :: SimpleHTML String -> SimpleHTML String -> Property
 prop_InsertModel k h = 
@@ -681,3 +685,7 @@ prop_InsertStmt s1 s2 = prop_InsertModel (convStmt s1) (convStmt s2)
 
 prop_InsertCmpt:: Component -> Component -> Property 
 prop_InsertCmpt c1 c2 = QC.within 1000000 $ prop_InsertModel (convCmpt c1) (convCmpt c2)
+
+-- >>> html2string $ convCmpt ut
+-- "<ul><li><p>This is love </p></li><li><p>Yep, it is </p></li></ul>"
+

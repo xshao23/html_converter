@@ -37,9 +37,8 @@ import HtmlConverter
       prop_InsertEmptyStmt,
       prop_InsertEmptyCmpt,
       prop_DeleteEmptyStmt,
-      prop_DeleteEmptyCmpt,
-      prop_DeleteDeleteStmt,
-      prop_DeleteDeleteCmpt )
+      prop_DeleteEmptyCmpt 
+      )
 
 -- Unit tests for convStmt
 tStmtTest :: Test
@@ -117,12 +116,6 @@ runTests = do
 
   putStrLn "quickCheck prop_DeleteEmptyCmpt"
   quickCheck prop_DeleteEmptyCmpt
-
-  putStrLn "quickCheck prop_DelettDeleteStmt"
-  quickCheck prop_DeleteDeleteStmt
-
-  putStrLn "quickCheck prop_DeleteDeleteCmpt"
-  quickCheck prop_DeleteDeleteCmpt
 
   putStrLn "quickCheck prop_InsertStmt"
   quickCheck prop_InsertStmt 
