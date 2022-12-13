@@ -6,9 +6,10 @@ module MarkdownParser where
 
 import Control.Applicative hiding ((<|>), many, optional)
 import Data.Char (isNumber, isSpace, isAlpha, isAlphaNum)
+import Data.Functor
 import Data.List.Split hiding (oneOf)
 import Data.List
-import Data.Functor
+import Data.String
 import Test.HUnit (Assertion, Counts, Test (..), assert, runTestTT, (~:), (~?=))
 import Test.QuickCheck as QC
 import Data.Set (Set)
@@ -26,12 +27,8 @@ import Text.Parsec.Error (newErrorUnknown)
 import Text.Parsec (runParserT)
 
 -- The function below will be called by IOHandler (borrowed from parseLuFile)
--- Note that Markdown file consists of many components (in parallel)
--- See MarkdownSyntax line 12
 parseMarkdownFile :: String -> IO (Either ParseError Markdown)
 parseMarkdownFile = parseFromFile (const <$> markdownP <*> eof)
-
-type ParseError1 = String 
 
 parseFromFile :: Parser a -> String -> IO (Either ParseError a)
 parseFromFile parser filename = do
@@ -50,6 +47,26 @@ markdownP = Markdown <$> many componentP
 blockP :: Parser Block 
 blockP = Block <$> many statementP
 
+statementP :: Parser Statement
+statementP = notFollowedBy (endOfLine *> wsp *> endOfLine) *> choice [
+  --try autoLinkP, 
+  try boldP, 
+  try italicP, 
+  try strikethroughP, 
+  try highlightP,
+  try subP,
+  try supP,
+  try backtickP, 
+  try emojiP,
+  try linkP,
+  try imageP, 
+  try lineBreakP,
+  try literalP <|> Literal . (:[]) <$> (try (endOfLine <* wsp) <|> oneOf reserved)
+  ]
+
+doParse :: Parser a -> String -> Either ParseError a
+doParse p = parse p ""
+
 strip :: String -> String
 strip [] = []
 strip [' '] = []
@@ -57,6 +74,15 @@ strip (x:xs) = x:strip xs
 
 wsp :: Parser String
 wsp = many (char ' ')
+
+reserved :: String
+reserved = "*_`)[] <!#\n\\~\\^\\="
+
+isReserved :: Char -> Bool
+isReserved c = c `elem` reserved
+
+emojiisReserved :: Char -> Bool 
+emojiisReserved c = c `elem` (reserved ++ ":")
 
 someTill :: Parser a -> Parser end -> Parser [a]
 someTill p end = liftA2 (:) p (manyTill p end)
@@ -66,6 +92,11 @@ surround start end = start *> (Block <$> someTill statementP (try end))
 
 between ::  String -> String -> Parser Block
 between start end = surround (string start) (string end)
+
+single :: Char -> Parser Block
+single ch = surround 
+  (satisfy (==ch)) 
+  (try (lookAhead (notFollowedBy $ between [ch, ch] [ch, ch]) *> satisfy(==ch)))
 
 boldP ::   Parser Statement
 boldP  = Bold <$> (between "**" "**" <|> try (between "__" "__"))
@@ -78,36 +109,15 @@ strikethroughP = Strikethrough <$> between "~~" "~~"
 
 highlightP :: Parser Statement 
 highlightP = Highlight <$> between "==" "==" 
-{-
-char' :: Char -> Parser Char
-char' c = satisfy (c ==)
-
-betweenS :: Parser open -> Parser a -> Parser close -> Parser a
-betweenS open p close = open *> p <* close
-
-stringValP :: Parser String
-stringValP = some anyChar
-
-stringP :: String -> Parser ()
-stringP s = string s *> many space *> pure ()
-
-blks :: Parser a -> Parser a
-blks x = betweenS (string "```") x (string "```")
-
-cP :: Parser Component 
-cP = CodeBlock <$> blks stringValP
--}
--- >>> doParse cP "``` abc ``` ```"
--- Left (line 1, column 16):
--- unexpected end of input
--- expecting "```"
-
 
 subP :: Parser Statement 
 subP = Sub <$> single '~'
 
 supP :: Parser Statement 
 supP = Sup <$> single '^'
+
+backtickP :: Parser Statement
+backtickP = Backtick <$> try (string "`" *> manyTill anyChar (string "`"))
 
 emojiP :: Parser Statement
 emojiP = char ':' *> (
@@ -122,58 +132,6 @@ toUnicode "devil" = "128520"
 toUnicode "smily" = "128522"
 toUnicode "cool" = "128526"
 toUnicode _ = ""
-
--- >>> doParse emojiP ":joy:"
--- Right (Emoji "U+1F603")
-
-single :: Char -> Parser Block
-single ch = surround 
-  (satisfy (==ch)) 
-  (try (lookAhead (notFollowedBy $ between [ch, ch] [ch, ch]) *> satisfy(==ch)))
-
-statementP :: Parser Statement
-statementP = notFollowedBy (endOfLine *> wsp *> endOfLine) *> choice [
-  try backtickP, 
-  try imageP, 
-  --try autoLinkP, 
-  try linkP,
-  try boldP, 
-  try italicP, 
-  try strikethroughP, 
-  try highlightP,
-  try subP,
-  try supP,
-  try lineBreakP,
-  try emojiP,
-  try literalP <|> Literal . (:[]) <$> (try (endOfLine <* wsp) <|> oneOf reserved)
-  ]
-
-lineBreakP ::  Parser Statement
-lineBreakP  = do
-  try $ string "\\" <|> (count 2 (char ' ') <* many (char ' '))
-  try $ lookAhead $ char '\n' <* many (char ' ') <* satisfy (/= '\n')
-  return LineBreak
-
-backtickP :: Parser Statement
-backtickP = Backtick <$> try (string "`" *> manyTill anyChar (string "`"))
-
-codeblockP :: Parser Component
-codeblockP = do
-      s <- try (string "```\n" *> manyTill anyChar (string "```"))
-      return $ CodeBlock (Block (map Literal (splitOn "\n" s) ))
-
-ss = splitOn "\n" "abc \n  def()"
-
-sTest = "```\nabc\ndef()  ```"
-
--- >>> doParse codeblockP sTest
--- Right (CodeBlock (Block [Literal "abc",Literal "def()  "]))
-
--- >>> ss
--- ["abc ","  def()"]
-
--- >>> doParse codeblockP "```\nabc  \n   def()```"
--- Right (CodeBlock (Block [Literal "abc  ",Literal "   def()"]))
 
 titleP :: Parser (String, Maybe String)
 titleP = char '(' *> many (char ' ') *> p <* many (char ' ') <* char ')'
@@ -207,36 +165,11 @@ imageP = (\alt (link, title) -> Image alt link title)
          <$> (string "![" *>  manyTill anyChar (char ']'))
          <*> titleP
 
-reserved :: String
-reserved = "*_`)[] <!#\n\\~\\^\\="
-
-isReserved :: Char -> Bool
-isReserved c = c `elem` reserved
-
-emojiisReserved :: Char -> Bool 
-emojiisReserved c = c `elem` (reserved ++ ":")
-
-combineStmts :: Block -> Block
-combineStmts (Block []) = Block []
-combineStmts (Block [x]) = Block [x]
-combineStmts (Block (s1 : s2 : ss)) = case (s1, s2) of
-  (Literal a, Literal b@"\n") -> combineStmts $ Block (Literal (strip a ++ b) : ss)
-  (Literal a, Literal b) -> combineStmts $ combineStr Literal a b ss
-  (Bold b1, Bold b2) -> combineStmts $ combineBlk Bold b1 b2 ss
-  (Italic b1, Italic b2) -> combineStmts $ combineBlk Italic b1 b2 ss
-  (Strikethrough b1, Strikethrough b2) -> combineStmts $ combineBlk Strikethrough b1 b2 ss
-  (Highlight b1, Highlight b2) -> combineStmts $ combineBlk Highlight b1 b2 ss
-  (Sub b1, Sub b2) -> combineStmts $ combineBlk Sub b1 b2 ss
-  (Sup b1, Sup b2) -> combineStmts $ combineBlk Sup b1 b2 ss
-  (Backtick a, Backtick b) -> combineStmts $ combineStr Backtick a b ss
-  (Emoji a, Emoji b) -> combineStmts $ combineStr Emoji a b ss
-  _ -> Block [s1] <> combineStmts (Block (s2 : ss))
-
-combineBlk :: (Block -> Statement) -> Block -> Block -> [Statement] -> Block 
-combineBlk f x y xs = Block (f (combineStmts (x <> y)) : xs)
-
-combineStr :: (String -> Statement) -> String -> String -> [Statement] -> Block 
-combineStr f x y xs = Block (f (x ++ y) : xs)
+lineBreakP ::  Parser Statement
+lineBreakP  = do
+  try $ string "\\" <|> (count 2 (char ' ') <* many (char ' '))
+  try $ lookAhead $ char '\n' <* many (char ' ') <* satisfy (/= '\n')
+  return LineBreak
 
 literalP :: Parser Statement
 literalP = Literal . dropWspOnly <$> some (
@@ -265,8 +198,6 @@ autoLinkP = (\s -> Link (Block [Literal s]) s Nothing) <$> p
                             ++ "abcdefghijklmnopqrstuvwxyz"
                             ++ "0123456789-._~:/?#[]@!$&'()*+,;=")
 -}
-doParse :: Parser a -> String -> Either ParseError a
-doParse p = parse p ""
 
 headingP :: Parser Component
 headingP = do
@@ -292,15 +223,6 @@ plainP' = do
   b <- try (someTill statementP (lookAhead stopP)) <|> some statementP
   return (Block b)
 
--- >>> doParse plainP "This is love  \n\nYes, it is  \n\n"
--- Right (Plain (Block [Literal "This",Literal " ",Literal "is",Literal " ",Literal "love",Literal " ",Literal " "]))
-
--- >>> doParse paragraphP "This is love  \n\nYes, it is  \n\n"
--- Right (Paragraph (Block [Literal "This",Literal " ",Literal "is",Literal " ",Literal "love",Literal " ",Literal " "]))
-
--- >>> doParse paragraphP "This is love  \n\nYes, it is  \n\n"
--- Right (Paragraph (Block [Literal "This",Literal " ",Literal "is",Literal " ",Literal "love",Literal " ",Literal " "]))
-
 blockquoteP :: Parser Component 
 blockquoteP = do 
   ss <- some blockquoteP'
@@ -312,18 +234,6 @@ blockquoteP' = do
   case doParse blockP s of 
     Left _ -> return (Block [])
     Right b -> return b
-  
--- >>> doParse blockP "This is love"
--- Right (Block [Literal "This",Literal " ",Literal "is",Literal " ",Literal "love"])
-
--- >>> doParse blockquoteP' "> This is love\n"
--- Right (Block [Literal "This",Literal " ",Literal "is",Literal " ",Literal "love"])
-
--- >>> doParse blockquoteP "> ***This is love***\n> ~~Yep, it is~~ \n"
--- Right (Blockquote [Block [Bold (Block [Italic (Block [Literal "This",Literal " ",Literal "is",Literal " ",Literal "love"])])],Block [Strikethrough (Block [Literal "Yep,",Literal " ",Literal "it",Literal " ",Literal "is"]),Literal " "]])
-
--- >>> doParse blockquoteP "> **A**\n> B\n"
--- Right (Blockquote [Block [Bold (Block [Literal "A"])],Block [Literal "B"]])
 
 listP :: Parser Component 
 listP = ulP <|> olP
@@ -376,20 +286,8 @@ orderedListP' d lastItem itemList = do
             nested <- orderedListP (length ws) currItem []
             orderedListP' (length ws) (lastItem ++ [nested]) itemList
 
--- >>> doParse (orderedListP 0 [] []) "1. Hello world\n2. B\n  3. C\n  4. D\n    5. E\n      6. F\n***"
-
-oans = OrderedList [
-  [Paragraph (Block [Literal "Hello",Literal " ",Literal "world"])],
-  [Paragraph (Block [Literal "B"]),OrderedList [
-    [Paragraph (Block [Literal "C"])],
-    [Paragraph (Block [Literal "D"]),OrderedList [
-      [Paragraph (Block [Literal "E"]),OrderedList [
-        [Paragraph (Block [Literal "F"])]]]]]]]]
-
--- >>> doParse olP "1. Hello world\n"
--- Left (line 2, column 1):
--- unexpected end of input
--- expecting " "
+-- >>> doParse ulP "- Hello world\n- B\n  - C\n  - D\n    - E\n      - F\n-"
+-- Right (UnorderedList [[Plain (Block [Literal "Hello",Literal " ",Literal "world"])],[Plain (Block [Literal "B"]),UnorderedList [[Plain (Block [Literal "C"])],[Plain (Block [Literal "D"]),UnorderedList [[Plain (Block [Literal "E"]),UnorderedList [[Plain (Block [Literal "F"])]]]]]]]])
 
 otmp :: Parser Statement 
 otmp = do 
@@ -400,52 +298,6 @@ otmp = do
       return $ Literal s
     else return $ Literal ("length is " ++ show (length ws))
 
--- >>> doParse otmp "  1. Hello world\n"
--- Right (Literal "Hello world")
-
--- >>> doParse otmp "  1. haha\n"
--- Right (Literal "haha")
-
--- >>> doParse ulP "- Hello world\n-"
--- Left (line 2, column 2):
--- unexpected end of input
--- expecting " "
-
--- >>> doParse ulP "- Hello world\n- B\n  - C\n  - D\n    - E\n      - F\n-"
--- Right (UnorderedList [[Paragraph (Block [Literal "Hello",Literal " ",Literal "world"])],[Paragraph (Block [Literal "B"]),UnorderedList [[Paragraph (Block [Literal "C"])],[Paragraph (Block [Literal "D"]),UnorderedList [[Paragraph (Block [Literal "E"]),UnorderedList [[Paragraph (Block [Literal "F"])]]]]]]]])
-
-ans3' = UnorderedList [[Paragraph (Block [Literal "A"])],[Paragraph (Block [Literal "B"]),UnorderedList [[Paragraph (Block [Literal "C"])],[Paragraph (Block [Literal "D"]),UnorderedList [[Paragraph (Block [Literal "E"]),UnorderedList [[Paragraph (Block [Literal "F"])]]]]]]]]
-  
-ans3 = UnorderedList [
-  [Paragraph (Block [Literal "A"])],
-  [Paragraph (Block [Literal "B"]),UnorderedList [
-    [Paragraph (Block [Literal "C"])],
-    [Paragraph (Block [Literal "D"]),UnorderedList [
-      [Paragraph (Block [Literal "E"]),UnorderedList [
-        [Paragraph (Block [Literal "F"])]]]]]]]]
-
--- >>> ans3 == ans3'
--- True
-
--- >>> doParse ulP "- A\n- B\n  - C\n  - D\n-"
--- Right (
-  
-ans' = UnorderedList [
-  [Paragraph (Block [Literal "A"])],
-  [Paragraph (Block [Literal "B"]),UnorderedList [
-    [Paragraph (Block [Literal "C"])],
-    [Paragraph (Block [Literal "D"])]
-    ]]
-  ]
-  
-ans = UnorderedList [
-    [Paragraph (Block [Literal "A"])],
-    [Paragraph (Block [Literal "B"]),UnorderedList [
-      [Paragraph (Block [Literal "C"])],
-      [Paragraph (Block [Literal "D"])]
-    ]]
-  ]
-
 tmp :: Parser Statement 
 tmp = do 
   ws <- wsp <* lookAhead alphaNum
@@ -455,11 +307,86 @@ tmp = do
       return $ Literal s
     else return $ Literal ("length is " ++ show (length ws))
 
--- >>> doParse tmp " hello\n"
--- Right (Literal "length is 1")
 
-stopP :: Parser Component
-stopP = try hrP <|> try headingP <|> try listP
+tableP :: Parser Component 
+tableP = Table <$> rowsP
+
+rowsP :: Parser [Row]
+rowsP = do 
+  rows <- some rowP
+  return $ filter (not . null) rows
+
+rowP :: Parser Row 
+rowP = do 
+  row <- wsp *> char '|' *> wsp *> manyTill anyChar (char '\n')
+  if "-" `isPrefixOf` row then return []
+  else let col = init (splitOn "|" row)
+    in return (colP col)
+
+colP :: [String] -> Row 
+colP ss = map cellP (filter (not . null) ss)
+
+cellP :: String -> Component 
+cellP s = do 
+  case doParse componentP s of 
+    Left _ -> Plain (Block [Literal ""])
+    Right c -> c--toPlain c
+
+tt = "|A|B|\n|--|---|\n|Paragraph|Text|\n"
+
+toPlain :: Component -> Component 
+toPlain (Paragraph b) = Plain b 
+toPlain c = c
+
+-- >>> doParse tableP tt
+-- Right (Table [[Plain (Block [Literal "A"]),Plain (Block [Literal "B"])],[Plain (Block [Literal "Paragraph"]),Plain (Block [Literal "Text"])]])
+  
+tab = Table [
+  [Paragraph (Block [Literal "A"]),Paragraph (Block [Literal "B"])],
+  [Paragraph (Block [Literal "Paragraph"]),Paragraph (Block [Literal "Text"])]]
+
+-- >>> doParse rowP " | abc | def | sd | \n"
+
+-- >>> doParse rowsP " | abc | def | sd | \n| g | yj | s | \n"
+-- Right [[Paragraph (Block [Literal "abc"]),Paragraph (Block [Literal " ",Literal "def"]),Paragraph (Block [Literal " ",Literal "sd"])],[Paragraph (Block [Literal "g"]),Paragraph (Block [Literal " ",Literal "yj"]),Paragraph (Block [Literal " ",Literal "s"])]]
+
+-- >>> cellP " abc hello "
+-- Paragraph (Block [Literal " ",Literal "abc",Literal " ",Literal "hello"])
+
+
+test :: Parser Statement 
+test = do 
+  ws <- wsp *> char '|' *> manyTill anyChar (char '\n')-- _ <- string " abc | def | sd | \n"
+
+  return (Literal ws)
+
+-- >>> doParse test " | abc | def | sd | \n"
+
+
+-- >>> splitOn "|" " abc | def | sd |"
+-- [" abc "," def "," sd ",""]
+
+-- >>> doParse cellP " Syntax AB  |\n"
+-- Right (Paragraph (Block [Literal "Syntax",Literal " ",Literal "AB"]))
+
+-- >>> doParse rowP "| abc | def | sd |\n"
+-- Left (line 2, column 1):
+-- unexpected end of input
+-- expecting " " or "|"
+
+rtmp :: Parser Statement 
+rtmp = do 
+  ws <- wsp <* lookAhead (char '|')
+  if length ws == 2 
+    then do
+      s <- manyTill alphaNum (string "\n")
+      return $ Literal s
+    else return $ Literal ("length is " ++ show (length ws))
+
+codeblockP :: Parser Component
+codeblockP = do
+      s <- try (string "```\n" *> manyTill anyChar (string "```"))
+      return $ CodeBlock (Block (map Literal (splitOn "\n" s) ))
 
 hrP :: Parser Component
 hrP = wsp *> (hrP' '*' <|> hrP' '-' <|> hrP' '_')
@@ -482,6 +409,10 @@ componentP = (
   <|> try blockquoteP
   <|> try headingP 
   <|> try listP 
+  <|> try tableP
   <|> try paragraphP
   <|> try plainP
   ) <* optional (many endOfLine)
+
+stopP :: Parser Component
+stopP = try hrP <|> try headingP <|> try listP

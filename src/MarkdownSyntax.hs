@@ -19,7 +19,6 @@ data Component
   | Blockquote [Block] -- <blockquote>
   | OrderedList [Item] -- <ol>
   | UnorderedList [Item] -- <ul>
-  | TaskList [TaskItem] -- <ul class="checked">
   | Table [Row]
   | DefinitionList [DefItem]
   | CodeBlock Block -- <code>
@@ -29,9 +28,6 @@ data Component
   deriving (Eq, Show)
 
 type Item = [Component]
-
-data TaskItem = TI Bool [Component]
-  deriving (Eq, Show)
 
 type Row = [Col] 
 type Col = Component
@@ -120,7 +116,6 @@ genCmpt n =
       (n, Blockquote <$> genBlocks n'),
       (n, UnorderedList <$> genItems n'),
       (n, OrderedList <$> genItems n'),
-      (n, TaskList <$> genTaskItems n'),
       (n, Table <$> genRows n'),
       (n, DefinitionList <$> genDefItems n'),
       (n, CodeBlock <$> genBlock n'),
@@ -205,20 +200,6 @@ genItems n = QC.frequency [
   (1, return []),
   (n, (:) <$> genItem n <*> genItems (n `div` 2))
   ] 
-
-genTaskItem :: Int -> Gen TaskItem 
-genTaskItem 0 = pure (TI False [])
-genTaskItem n = QC.frequency [
-  (1, return (TI False [])),
-  (n, TI <$> genBool <*> genItem (n `div` 2))
-  ]
-
-genTaskItems :: Int -> Gen [TaskItem]
-genTaskItems 0 = pure [] 
-genTaskItems n = QC.frequency [
-  (1, return []),
-  (n, (:) <$> genTaskItem n <*> genTaskItems (n `div` 2))
-  ]
 
 genRows :: Int -> Gen [Row] 
 genRows 0 = pure [] 

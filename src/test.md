@@ -92,6 +92,21 @@ The silver answer rang, -- **`Not Death, but love.`**
            5.  ==***I shall but love thee better after death.***==
 ***
 
+## Part XX - Table 
+
+| Column 1 | Column 2 | Column 3 |
+| ---- | ---- | ---- |
+| Belovëd, my Belovëd, when I *think* | Went counting all my chains as if that **so** | With personal act or speech,—nor ever **cull** |
+| That thou wast in the world a year **ago**, | They never could fall off at any **blow** | Some prescience of thee with the blossoms ==white== |
+| What time I sat alone here in the **snow** | Struck by thy possible hand,—why, thus I *drink* | Thou sawest growing!  Atheists are as **dull**, |
+| And saw no footprint, heard the silence *sink* | Of life’s great cup of wonder!  **Wonderful**, | Who cannot guess God’s presence out of ==sight==. |
+| No moment at thy voice, but, link by *link*, | Never to feel thee thrill the day or ==night== | **`END`** |
+***
+
+## Part XXI - Definition List 
+
+***
+
 ## Code Block
 
 ```

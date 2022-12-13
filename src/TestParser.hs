@@ -29,8 +29,34 @@ test_componentP =
       ]
 
 
+-- >>> doParse emojiP ":joy:"
+-- Right (Emoji "U+1F603")
+
 -- >>> doParse paragraphP "Hello world."
 -- Right (Paragraph (Block [Literal "Hello",Literal " ",Literal "world."]))
+
+
+-- >>> doParse blockP "This is love"
+-- Right (Block [Literal "This",Literal " ",Literal "is",Literal " ",Literal "love"])
+
+-- >>> doParse blockquoteP' "> This is love\n"
+-- Right (Block [Literal "This",Literal " ",Literal "is",Literal " ",Literal "love"])
+
+-- >>> doParse blockquoteP "> ***This is love***\n> ~~Yep, it is~~ \n"
+-- Right (Blockquote [Block [Bold (Block [Italic (Block [Literal "This",Literal " ",Literal "is",Literal " ",Literal "love"])])],Block [Strikethrough (Block [Literal "Yep,",Literal " ",Literal "it",Literal " ",Literal "is"]),Literal " "]])
+
+-- >>> doParse blockquoteP "> **A**\n> B\n"
+-- Right (Blockquote [Block [Bold (Block [Literal "A"])],Block [Literal "B"]])
+
+
+-- >>> doParse ulP "- Hello world\n- B\n  - C\n  - D\n    - E\n      - F\n-"
+-- Right (UnorderedList [[Paragraph (Block [Literal "Hello",Literal " ",Literal "world"])],[Paragraph (Block [Literal "B"]),UnorderedList [[Paragraph (Block [Literal "C"])],[Paragraph (Block [Literal "D"]),UnorderedList [[Paragraph (Block [Literal "E"]),UnorderedList [[Paragraph (Block [Literal "F"])]]]]]]]])
+
+-- >>> doParse (orderedListP 0 [] []) "1. Hello world\n2. B\n  3. C\n  4. D\n    5. E\n      6. F\n***"
+
+
+-- >>> doParse codeblockP "```\nabc  \n   def()```"
+-- Right (CodeBlock (Block [Literal "abc  ",Literal "   def()"]))
 
 -- >>> runTestTT test_statementP
 -- Counts {cases = 14, tried = 14, errors = 0, failures = 0}

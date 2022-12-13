@@ -60,10 +60,6 @@ boldAndItalic = convStmt $ Bold (Block [
 -- >>> html2string (convCmpt testOrderedList)
 -- "<ol><li>first line</li><li>methods: <ul><li><code>getDate()</code></li><li><code>getTime()</code></li><li><code>getMinutes()</code></li></ul></li></ol>"
 
--- >>> html2string (convCmpt testTaskList)
--- "<ul><li class=\"checked\">Pay bills</li><li>Submit assignment</li><li class=\"checked\"><strong>Exercise</strong></li></ul>"
-
-
 -- >>> readAttris t
 -- "src=\"http://\" title=\"Upenn\" alt=\"Flowers in Chania\" "
 
@@ -74,6 +70,9 @@ convert (Markdown cs) = render (map convCmpt cs)
 render :: [SimpleHTML String] -> SimpleHTML String 
 render ss = Element "html" [] [Element "body" [] ss]
 
+tableBorder :: Maybe String 
+tableBorder = Just "border-spacing: 40px 0"
+
 -- Part 2 : Convert each component of the Markdown to a SimpleHTML
 convCmpt :: Component -> SimpleHTML String
 convCmpt (Heading h b) = Element (show h) [] (convBlock b)
@@ -81,8 +80,7 @@ convCmpt (Paragraph b) = Element "p" [] (convBlock b)
 convCmpt (Blockquote bs) = Element "blockquote" [] (convBlocks bs)
 convCmpt (OrderedList ol) = Element "ol" [] (map convItem ol)
 convCmpt (UnorderedList ul) = Element "ul" [] (map convItem ul)
-convCmpt (TaskList ti) = Element "ul" [] (map convTaskItem ti)
-convCmpt (Table tr) = Element "table" [] (map convRow tr)
+convCmpt (Table tr) = Element "table" (addAttris [("style", tableBorder)]) (convRows True tr)
 convCmpt (DefinitionList dl) = Element "dl" [] (concatMap convDefItem dl)
 convCmpt (CodeBlock b) = convBr "code" b
 convCmpt HorizontalRule = Element "hr" [] [] 
@@ -93,15 +91,6 @@ convCmpt (Plain (Block ss)) =
     f :: Statement -> String 
     f (Literal s) = s  
     f _ = ""
-
--- >>> convCmpt (Plain (Block [Literal "This",Literal " ",Literal "is",Literal " ",Literal "love",Literal " ",Literal " "]))
--- PCDATA "This is love  "
-
--- >>> html2string $ convCmpt (Plain (Block [Literal "This",Literal " ",Literal "is",Literal " ",Literal "love",Literal " ",Literal " "]))
--- "This is love  "
-
-pb = Plain (
-  Block [Literal "This",Literal " ",Literal "is",Literal " ",Literal "love",Literal " ",Literal " "])
 
 convBr :: String -> Block -> SimpleHTML String 
 convBr tag (Block ss) = Element tag [] f
@@ -122,41 +111,26 @@ convChar :: Char -> String
 convChar ' ' = "&nbsp;"
 convChar c = [c]
 
--- >>> convCmpt (CodeBlock (Block [Literal "abc ",Literal " def()"]))
--- Element "code" [] [PCDATA "abc&nbsp;",Element "br" [] [],PCDATA "&nbsp;def()"]
-
--- >>> html2string $ convCmpt (CodeBlock (Block [Literal "abc ",Literal " def()"]))
--- "<code>abc&nbsp;<br/>&nbsp;def()<br/></code>"
-
--- >>> html2string $ convCmpt (Heading H1 (Block [Literal "H1",Literal " ",Literal "\n",Literal "Heading"]))
--- "<h1>H1&nbsp;<br/>Heading</h1>"
-
 convItem :: Item -> SimpleHTML String 
-convItem item = Element "li" [] (map convCmpt item) 
+convItem item = Element "li" [] (map convCmpt item)
 
-convTaskItem :: TaskItem -> SimpleHTML String 
-convTaskItem (TI True item) = Element "li" (addAttris [("class", Just "checked")]) (map convCmpt item) 
-convTaskItem (TI False item) = convItem item
+convRows :: Bool -> [Row] -> [SimpleHTML String]
+convRows _ [] = [] 
+convRows isTitle (r : rs) = Element "tr" [] (
+  map (if isTitle then convRowTitle else convCol) r
+  ) : convRows False rs
 
-convRow :: Row -> SimpleHTML String 
-convRow row = Element "tr" [] (map convCol row)
+convRowTitle :: Component -> SimpleHTML String 
+convRowTitle title = Element "th" [] [convCmpt title]
 
 convCol :: Component -> SimpleHTML String 
-convCol col = Element "th" [] [convCmpt col]
+convCol col = Element "td" [] [convCmpt col]
 
 convDefItem :: DefItem -> [SimpleHTML String]
 convDefItem (DI c cs) = Element "dt" [] [convCmpt c] : getDefs cs
   where
     getDefs :: [Component] -> [SimpleHTML String]
     getDefs = map (\c -> Element "dd" [] [convCmpt c])
-
-bq =  Blockquote [Block [Bold (Block [Italic (Block [Literal "This",Literal " ",Literal "is",Literal " ",Literal "love"])])],Block [Strikethrough (Block [Literal "Yep,",Literal " ",Literal "it",Literal " ",Literal "is"]),Literal " "]]
-
-
-
--- >>> html2string (convCmpt bq)
--- "<blockquote><strong><em>This is love</em></strong><br/><s>Yep, it is</s> </blockquote>"
-
 
 -- Part 3 : Convert each statement within the component to a SimpleHTML
 convBlocks :: [Block] -> [SimpleHTML String]
@@ -394,25 +368,18 @@ expectedUnorderedList = Element "ul" [] [
   ]
   -}
 
+tab = Table [[Plain (Block [Literal "A"]),Plain (Block [Literal "B"])],[Plain (Block [Literal "Paragraph"]),Plain (Block [Literal "Text"])]]
+
+-- >>> html2string $ convCmpt tab 
+-- "<table><tr><th>A</th><th>B</th></tr><tr><td>Paragraph</td><td>Text</td></tr></table>"
+
+ul = UnorderedList [[Plain (Block [Literal "Hello",Literal " ",Literal "world"])],[Plain (Block [Literal "B"]),UnorderedList [[Plain (Block [Literal "C"])],[Plain (Block [Literal "D"]),UnorderedList [[Plain (Block [Literal "E"]),UnorderedList [[Plain (Block [Literal "F"])]]]]]]]]
+
+-- >>> html2string $ convCmpt ul
+-- "<ul><li>Hello world</li><li>B<ul><li>C</li><li>D<ul><li>E<ul><li>F</li></ul></li></ul></li></ul></li></ul>"
+
 tTestUnorderedList :: Test 
 tTestUnorderedList = convCmpt testUnorderedList ~?= expectedUnorderedList
-
-testTaskList :: Component 
-testTaskList = TaskList [
-  TI True [Plain (Block [Literal "Pay bills"])],
-  TI False [Plain (Block [Literal "Submit assignment"])],
-  TI True [Plain (Block [Literal "Exercise"])]
-  ]
-
-expectedTaskList :: SimpleHTML String
-expectedTaskList = Element "ul" [] [
-  Element "li" [("class", "checked")] [PCDATA "Pay bills"],
-  Element "li" [] [PCDATA "Submit assignment"],
-  Element "li" [("class", "checked")] [PCDATA "Exercise"]
-  ]
-
-tTestTaskList :: Test 
-tTestTaskList = convCmpt testTaskList ~?= expectedTaskList
 
 testTable :: Component
 testTable = Table [
@@ -432,9 +399,9 @@ testTable = Table [
     Plain (Block [Literal "Mexico"])
     ]
   ]
-
+  
 expectedTable :: SimpleHTML String 
-expectedTable = Element "table" [] [
+expectedTable = Element "table" [("style","border-spacing: 40px 0")] [
   Element "tr" [] [
     Element "th" [] [PCDATA "Company"],
     Element "th" [] [PCDATA "Contact"],
@@ -442,15 +409,15 @@ expectedTable = Element "table" [] [
     ],
 
   Element "tr" [] [
-    Element "th" [] [PCDATA "Alfreds Futterkiste"],
-    Element "th" [] [PCDATA "Maria Anders"],
-    Element "th" [] [PCDATA "Germany"]
+    Element "td" [] [PCDATA "Alfreds Futterkiste"],
+    Element "td" [] [PCDATA "Maria Anders"],
+    Element "td" [] [PCDATA "Germany"]
     ],
 
   Element "tr" [] [
-    Element "th" [] [PCDATA "Centro comercial Moctezuma"],
-    Element "th" [] [PCDATA "Francisco Chang"],
-    Element "th" [] [PCDATA "Mexico"]
+    Element "td" [] [PCDATA "Centro comercial Moctezuma"],
+    Element "td" [] [PCDATA "Francisco Chang"],
+    Element "td" [] [PCDATA "Mexico"]
     ]
   ]
 
@@ -465,13 +432,13 @@ tTestTable = convCmpt testTable ~?= expectedTable
     <th><strong>Country</strong></th>
   </tr>
   <tr>
-    <th>Alfreds Futterkiste</th>
-    <th>Maria Anders</th>
-    <th>Germany</th></tr>
+    <td>Alfreds Futterkiste</td>
+    <td>Maria Anders</td>
+    <td>Germany</th></td>
   <tr>
-    <th>Centro comercial Moctezuma</th>
-    <th>Francisco Chang</th>
-    <th>Mexico</th>
+    <td>Centro comercial Moctezuma</td>
+    <td>Francisco Chang</td>
+    <td>Mexico</td>
   </tr>
 </table>"
 -}
