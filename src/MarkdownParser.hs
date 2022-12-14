@@ -49,7 +49,6 @@ blockP = Block <$> many statementP
 
 statementP :: Parser Statement
 statementP = notFollowedBy (endOfLine *> wsp *> endOfLine) *> choice [
-  --try autoLinkP, 
   try boldP, 
   try italicP, 
   try strikethroughP, 
@@ -67,16 +66,21 @@ statementP = notFollowedBy (endOfLine *> wsp *> endOfLine) *> choice [
 doParse :: Parser a -> String -> Either ParseError a
 doParse p = parse p ""
 
+lstrip :: String -> String
+lstrip [] = []
+lstrip (x : xs) = if x == ' ' then lstrip xs else x : xs
+
+rstrip :: String -> String 
+rstrip = reverse . lstrip . reverse
+
 strip :: String -> String
-strip [] = []
-strip [' '] = []
-strip (x:xs) = x:strip xs
+strip = rstrip . lstrip
 
 wsp :: Parser String
 wsp = many (char ' ')
 
 reserved :: String
-reserved = "*_`)[] <!#\n\\~\\^\\="
+reserved = "*_`)[] <!\n\\~\\^\\="
 
 isReserved :: Char -> Bool
 isReserved c = c `elem` reserved
@@ -121,7 +125,7 @@ backtickP = Backtick <$> try (string "`" *> manyTill anyChar (string "`"))
 
 emojiP :: Parser Statement
 emojiP = char ':' *> (
-  Emoji . toUnicode . dropWspOnly <$> some (
+  Emoji . toUnicode . strip <$> some (
     notFollowedBy (endOfLine *> wsp *> endOfLine) *> satisfy (not . emojiisReserved))
   ) <* char ':'
 
@@ -134,36 +138,27 @@ toUnicode "cool" = "128526"
 toUnicode _ = ""
 
 titleP :: Parser (String, Maybe String)
-titleP = char '(' *> many (char ' ') *> p <* many (char ' ') <* char ')'
-  where              
-    p = (,) <$> destLinkP <*> titleP
-    destLinkP :: Parser String
-    destLinkP = try (char '<' *> manyTill (satisfy (/= '\n')) (char '>')) 
-                <|> many (satisfy (\c -> c /= ' ' && c /= ')' && c /= '\n'))
-    titleP :: Parser (Maybe String)
-    titleP = try (Just <$> (some (char ' ') *> try wrappedTitleP)) <|> Nothing <$ (many (char ' ') *> string "")
-    wrappedTitleP :: Parser String
-    wrappedTitleP = choice [
-      char '"' *> manyTill anyChar  (char '"'),
-      char '\'' *> manyTill anyChar  (char '\''),
-      char '(' *> manyTill anyChar  (char ')')
-      ]
+titleP = do 
+  s <- char '(' *> wsp *> manyTill anyChar (try (wsp *> char ')'))
+  if '\"' `notElem` s  
+    then return (s, Nothing)
+    else let 
+      l = filter (not . null) (splitOn "\"" s) in 
+        case l of 
+          [href, title] -> return (strip href, Just title)
+          _ -> return (s, Nothing)
 
-linkP :: Parser Statement
-linkP = (\text (link, title) -> Link text link title)
-    <$> (char '[' *> (Block <$> manyTill statementP' (char ']'))) --(char '[' *> (combineStmts . Block <$> manyTill statementP' (char ']')))
-    <*> titleP
-  where
-    statementP' :: Parser Statement
-    statementP' = try $ do
-                  --notFollowedBy autoLinkP
-                  notFollowedBy linkP 
-                  statementP
+linkP :: Parser Statement 
+linkP = do 
+  ss <- char '[' *> manyTill statementP (char ']')
+  (href, title) <- titleP 
+  return (Link (Block ss) href title)
 
-imageP :: Parser Statement
-imageP = (\alt (link, title) -> Image alt link title)
-         <$> (string "![" *>  manyTill anyChar (char ']'))
-         <*> titleP
+imageP :: Parser Statement 
+imageP = do 
+  alt <- string "![" *> manyTill anyChar (char ']') 
+  (href, title) <- titleP 
+  return (Image alt href title)
 
 lineBreakP ::  Parser Statement
 lineBreakP  = do
@@ -172,40 +167,32 @@ lineBreakP  = do
   return LineBreak
 
 literalP :: Parser Statement
-literalP = Literal . dropWspOnly <$> some (
+literalP = Literal . strip <$> some (
   notFollowedBy (endOfLine *> wsp *> endOfLine) *> satisfy (not . isReserved)
   )
-
-dropWspOnly s = reverse (dropS (reverse s)) where
-  dropS ls@(x:xs) = if x == ' ' then dropS xs else ls
-  dropS [] = []
-
-{-
-autoLinkP :: Parser Statement
-autoLinkP = (\s -> Link (Block [Literal s]) s Nothing) <$> p
-  where
-    p :: Parser String
-    p = char '<' *> ((++) <$> prefixP <*> (notFollowedBy backtickP >> many urlChar <* char '>'))
-    prefixP :: Parser String
-    prefixP = (\a b c -> a:b++[c])
-                <$> satisfy isAlpha
-                <*> some (satisfy (\c -> isAlphaNum c || c == '.' || c == '+' || c == '-'))
-                <*> char ':'
-    urlChar :: Parser Char
-    urlChar = satisfy (`Set.member` whiteList)
-    whiteList :: Set Char
-    whiteList =  Set.fromList ("ABCDEFGHIJKLMNOPQRSTUVWXYZ" 
-                            ++ "abcdefghijklmnopqrstuvwxyz"
-                            ++ "0123456789-._~:/?#[]@!$&'()*+,;=")
--}
 
 headingP :: Parser Component
 headingP = do
   sps <- wsp
   hLevel <- some (char '#') 
   guard (length hLevel < 7 && not (null hLevel))
-  hText <- some (char ' ') *> blockP
-  return (Heading (getHeader (length hLevel)) hText)
+  ss <- some (char ' ') *> blockP
+  return (Heading (getHeader (length hLevel)) ss Nothing)
+  --return (Plain ss)
+
+-- >>> doParse headingP "# **H1 Heading** {#id-3}"
+-- Right (Plain (Block [Bold (Block [Literal "H1",Literal " ",Literal "Heading"]),Literal " ",Literal "{#id-3}"]))
+
+-- >>> doParse headingP "# **H1 Heading** {#id-3}"
+-- Right (Heading h1 (Block [Bold (Block [Literal "H1",Literal " ",Literal "Heading"]),Literal " ",Literal "{#id-3}"]) Nothing)
+
+hidP :: Int -> Block -> Component 
+hidP hl (Block []) = Heading (getHeader hl) (Block []) Nothing
+hidP hl (Block ss) = undefined
+
+withId :: Statement -> Bool 
+withId (Literal s) = '{' `elem` s && '}' `elem` s
+withId _ = False
 
 paragraphP :: Parser Component
 paragraphP = Paragraph <$> paragraphP'
@@ -339,22 +326,17 @@ defP = do
 
 codeblockP :: Parser Component
 codeblockP = do
-      s <- try (string "```\n" *> manyTill anyChar (string "```"))
-      return $ CodeBlock (Block (map Literal (splitOn "\n" s) ))
+  s <- try (string "```\n" *> manyTill anyChar (string "```"))
+  return $ CodeBlock (Block (map Literal (splitOn "\n" s) ))
 
-hrP :: Parser Component
-hrP = wsp *> (hrP' '*' <|> hrP' '-' <|> hrP' '_')
-  where 
-    hrP' :: Char -> Parser Component 
-    hrP' c = do
-      t <- count 3 (char c <* wsp)
-      i <- many (char (head t) <* wsp) *> optionMaybe (satisfy (/='\n'))
-      {-
-      case i of
-        Just _ -> fail "Unrecognized horizontal rules"
-        Nothing -> return ()
-        -}
-      return HorizontalRule
+hrP :: Parser Component 
+hrP = hrP' '*' <|> hrP' '-' <|> hrP' '_'
+
+hrP' :: Char -> Parser Component
+hrP' c = do 
+  _ <- wsp *> count 3 (char c) -- has to have at least three occurrences
+  r <- many (char c) <* wsp *> manyTill anyChar (try (wsp *> char '\n'))
+  if null r then return HorizontalRule else fail "Invalid Horizontal Rule"
 
 componentP :: Parser Component
 componentP = (

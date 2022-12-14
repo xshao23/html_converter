@@ -15,6 +15,7 @@ import HtmlConverter
       tTestLineBreak,
       tTestLiteral,
       tTestHeading,
+      tTestHeadingID,
       tTestParagraph,
       tTestBlockquote,
       tTestOrderedList,
@@ -63,6 +64,7 @@ tStmtTest = "Statement test" ~: TestList [
 tCmptTest :: Test 
 tCmptTest = "Component test" ~: TestList [
   tTestHeading,
+  tTestHeadingID,
   tTestParagraph,
   tTestBlockquote,
   tTestOrderedList,
@@ -74,7 +76,7 @@ tCmptTest = "Component test" ~: TestList [
   tTestPlain
   ]
 -- >>> runTestTT tCmptTest
--- Counts {cases = 12, tried = 12, errors = 0, failures = 0}
+-- Counts {cases = 11, tried = 11, errors = 0, failures = 0}
 
 tMarkdownTest :: Test 
 tMarkdownTest = "Markdown test" ~: TestList [

@@ -20,7 +20,7 @@ import HtmlConverter (tTestHighlight, t, tTestBacktick, tTestLineBreak)
 test_componentP :: Test
 test_componentP =
   TestList
-    [ doParse headingP "# H1 Heading"  ~?= Right (Heading H1 (Block [Literal "H1", Literal " ", Literal "Heading"])),
+    [ doParse headingP "# H1 Heading"  ~?= Right (Heading H1 (Block [Literal "H1", Literal " ", Literal "Heading"]) Nothing),
       doParse paragraphP "Hello world."  ~?= Right (Paragraph (Block [Literal "Hello", Literal " ", Literal "world."]))
       --doParse blockquoteP ">I love CIS552>\n>It's the best course!"  ~?= Right (Blockquote [Plain (Literal "I love CIS552"), Newline, Plain (Literal "It's the best course!")]),
       --doParse orderedListP "1. A\n2. B" ~?= Right (OrderedList [[Plain (Literal "first line")], [Plain (Literal "second line")]]),
@@ -85,7 +85,7 @@ defAns = DefinitionList [
       Paragraph (Block [Literal "Yes",Literal " ",Literal "there",Literal " ",Literal "you",Literal " ",Literal "go"])
       ]
     ]
-    
+
 -- >>> runTestTT test_statementP
 -- Counts {cases = 14, tried = 14, errors = 0, failures = 0}
 

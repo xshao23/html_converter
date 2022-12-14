@@ -14,7 +14,7 @@ newtype Markdown = Markdown [Component]
 -- TODO: Only Footnote left
 -- See https://www.markdownguide.org/basic-syntax
 data Component
-  = Heading Header Block
+  = Heading Header Block (Maybe String)
   | Paragraph Block -- <p>
   | Blockquote [Block] -- <blockquote>
   | OrderedList [Item] -- <ol>
@@ -111,7 +111,7 @@ genCmpt n =
     [ (1, return Newline),
       (1, return HorizontalRule),
       -- generate loops half as frequently as if statements
-      (n, Heading <$> genHeader <*> genBlock n'),
+      (n, Heading <$> genHeader <*> genBlock n' <*> genMaybe),
       (n, Paragraph <$> genBlock n'),
       (n, Blockquote <$> genBlocks n'),
       (n, UnorderedList <$> genItems n'),

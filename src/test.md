@@ -34,6 +34,7 @@ And a voice said in mastery, while I strove, --
 The silver answer rang, -- **`Not Death, but love.`**  
 
 :smily:
+
 ---
 
 ## Part VI - Block Quote
@@ -58,7 +59,7 @@ The silver answer rang, -- **`Not Death, but love.`**
 > God for myself, He hears that name of thine,
 > And sees within my eyes the tears of two.
 
----
+___
 
 ## Part XXXIII - Unordered Lists
 
@@ -76,7 +77,7 @@ The silver answer rang, -- **`Not Death, but love.`**
               - And catch the early love up in the late!
                 - Yes, call me by that name,—and I, in truth,
                 - With the same heart, will answer, and not wait. 
-***
+********
 
 ## Part XXXIII - Ordered Lists
 
@@ -94,7 +95,7 @@ The silver answer rang, -- **`Not Death, but love.`**
            3.  With my lost saints,—I love thee with the breath,
            4.  Smiles, tears, of all my life!—and, if God choose,
            5.  ==***I shall but love thee better after death.***==
-***
+---------
 
 ## Part XX - Table 
 
@@ -105,7 +106,7 @@ The silver answer rang, -- **`Not Death, but love.`**
 | What time I sat alone here in the **snow** | Struck by thy possible hand,—why, thus I *drink* | Thou sawest growing!  Atheists are as **dull**, |
 | And saw no footprint, heard the silence *sink* | Of life’s great cup of wonder!  **Wonderful**, | Who cannot guess God’s presence out of ==sight==. |
 | No moment at thy voice, but, link by *link*, | Never to feel thee thrill the day or ==night== | **`END`** |
-***
+________
 
 ## Part XXIII - Definition List 
 
@@ -179,4 +180,4 @@ The silver answer rang, -- **`Not Death, but love.`**
 
 ```
 
----
+______________

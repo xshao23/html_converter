@@ -75,7 +75,7 @@ tableBorder = Just "border-spacing: 40px 0"
 
 -- Part 2 : Convert each component of the Markdown to a SimpleHTML
 convCmpt :: Component -> SimpleHTML String
-convCmpt (Heading h b) = Element (show h) [] (convBlock b)
+convCmpt (Heading h b hid) = Element (show h) (addAttris [("id", hid)]) (convBlock b)
 convCmpt (Paragraph b) = Element "p" [] (convBlock b) 
 convCmpt (Blockquote bs) = Element "blockquote" [] (convBlocks bs)
 convCmpt (OrderedList ol) = Element "ol" [] (map convItem ol)
@@ -257,7 +257,7 @@ tTestLiteral =
 tTestHeading :: Test
 tTestHeading = 
   convCmpt (
-    Heading H1 (Block [Literal "H1 Heading", LineBreak, Literal "Continues"])
+    Heading H1 (Block [Literal "H1 Heading", LineBreak, Literal "Continues"]) Nothing
     ) ~?= Element "h1" [] [
       PCDATA "H1 Heading", 
       Element "br" [] [], 
@@ -265,6 +265,16 @@ tTestHeading =
       ]
       --["<h1>", "H1 Heading", "<br>", "Continues", "</h1>"] 
 
+tTestHeadingID :: Test 
+tTestHeadingID = 
+  convCmpt (
+    Heading H1 (Block [Literal "H1 Heading", LineBreak, Literal "Continues"]) (Just "heading1")
+    ) ~?= Element "h1" [("id", "heading1")] [
+      PCDATA "H1 Heading", 
+      Element "br" [] [], 
+      PCDATA "Continues"
+      ]
+      
 tTestParagraph :: Test
 tTestParagraph = 
   convCmpt (
@@ -341,11 +351,11 @@ tTestOrderedList = convCmpt testOrderedList ~?= expectedOrderedList
 testUnorderedList :: Component 
 testUnorderedList = UnorderedList [
   [
-    Heading H4 (Block [Literal "H4 Heading"]), 
+    Heading H4 (Block [Literal "H4 Heading"]) Nothing, 
     Paragraph (Block [Literal "I love Haskell"])
   ],
   [
-    Heading H5 (Block [Literal "H5 Heading"]), 
+    Heading H5 (Block [Literal "H5 Heading"]) Nothing, 
     Paragraph (Block [Literal "and FP in general"])
   ] 
   ]
@@ -507,7 +517,7 @@ tTestPlain =
 -- Unit tests of Markdown
 test1 :: Markdown
 test1 = Markdown [
-  Heading H1 (Block [Literal "Test Example 1"]),
+  Heading H1 (Block [Literal "Test Example 1"]) Nothing,
   Newline,
   HorizontalRule, 
   Newline,
@@ -549,8 +559,8 @@ tTest1 = convert test1 ~?= expected1
 
 test2 :: Markdown 
 test2 = Markdown [
-  Heading H1 (Block [Literal "H1 Heading"]),
-  Heading H3 (Block [Literal "H3 Heading"]),
+  Heading H1 (Block [Literal "H1 Heading"]) Nothing,
+  Heading H3 (Block [Literal "H3 Heading"]) Nothing,
   Paragraph (Block [
     Italic (Block [Literal "Italicized test"]),
     Bold (Block [Literal "Love is bold"]),
@@ -582,7 +592,7 @@ tTest2 = convert test2 ~?= expected2
 
 test3 :: Markdown 
 test3 = Markdown [
-  Heading H5 (Block [Literal "H5 Heading"]),
+  Heading H5 (Block [Literal "H5 Heading"]) Nothing,
   CodeBlock (Block [Literal "getDate()"])
   ]
 expected3 :: SimpleHTML String
