@@ -11,6 +11,8 @@ The author is [Elizabeth Barrett Browning](https://en.wikipedia.org/wiki/Elizabe
 
 ## Part I - Paragraph
 
+#### First Paragraph
+
 **I thought once how Theocritus had sung**   
 ~~Of the sweet years, the dear and wished-for years~~,  
 *Who each one in a gracious hand appears*  
@@ -20,6 +22,8 @@ I saw, in gradual vision through my tears,
 ***The sweet, sad years, the melancholy years,***  
 
 :joy:
+
+#### Second Paragraph
 
 Those of my own life, who by turns had flung  
 A shadow across me. Straightway I was 'ware,  
@@ -103,21 +107,76 @@ The silver answer rang, -- **`Not Death, but love.`**
 | No moment at thy voice, but, link by *link*, | Never to feel thee thrill the day or ==night== | **`END`** |
 ***
 
-## Part XXI - Definition List 
+## Part XXIII - Definition List 
 
-***
+**Is it indeed so?  If I lay here dead:**
+: ~~Wouldst thou miss any life in losing mine?~~
+: ==And would the sun for thee more coldly shine==
+
+**Because of grave-damps falling round my head:**
+: *I marvelled, my Belovëd, when I read*
+: ==***Thy thought so in the letter.  I am thine-***==
+: `But . . . so much to thee?  Can I pour thy wine`
+
+---
 
 ## Code Block
 
-```
-import itertools
+#### Some Python Code
 
-def twoSum(self, nums, target):
-  for i, n1 in enumerate(nums[ : -1]):
-    for j in range(i + 1, len(nums)):
-      if n1 + nums[j] == target:
-        return [i, j]
-  
-def ()
 ```
+  import itertools
+
+  def twoSum(self, nums, target):
+    for i, n1 in enumerate(nums[ : -1]):
+      for j in range(i + 1, len(nums)):
+        if n1 + nums[j] == target:
+          return [i, j]
+```
+
+#### Some Java Code 
+
+```
+  public class LRUCache {
+
+    public class Node {
+      private int val;
+      private Node left, right;
+
+      public Node(int val) {
+        this.val = val;
+      }
+    }
+
+    private int capacity;
+
+    public LRUCache(int k) {
+      capacity = k;
+      ...
+    }
+
+    public int get(int key) {
+
+    }
+
+    public void put(int key, int value) {
+
+    }
+
+  }
+```
+
+#### Some Haskell Code 
+
+```
+  testMap :: Test
+  testMap =
+    TestList
+      [ toUpperString' "abc" ~?= toUpperString "abc",
+        shiftPoly' (0.5, 0.5) [(1, 1), (2, 2), (3, 3)]
+          ~?= shiftPoly (0.5, 0.5) [(1, 1), (2, 2), (3, 3)]
+      ]
+
+```
+
 ---

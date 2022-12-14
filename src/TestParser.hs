@@ -21,7 +21,7 @@ test_componentP :: Test
 test_componentP =
   TestList
     [ doParse headingP "# H1 Heading"  ~?= Right (Heading H1 (Block [Literal "H1", Literal " ", Literal "Heading"])),
-      doParse paragraphP "Hello world."  ~?= Right (Paragraph (Block [Literal "Hello", Literal " ", Literal "world."])),
+      doParse paragraphP "Hello world."  ~?= Right (Paragraph (Block [Literal "Hello", Literal " ", Literal "world."]))
       --doParse blockquoteP ">I love CIS552>\n>It's the best course!"  ~?= Right (Blockquote [Plain (Literal "I love CIS552"), Newline, Plain (Literal "It's the best course!")]),
       --doParse orderedListP "1. A\n2. B" ~?= Right (OrderedList [[Plain (Literal "first line")], [Plain (Literal "second line")]]),
       --doParse unorderedListP "- A\n- B" ~?= Right (UnorderedList [[Plain (Literal "first line")], [Plain (Literal "second line")]])
@@ -58,6 +58,34 @@ test_componentP =
 -- >>> doParse codeblockP "```\nabc  \n   def()```"
 -- Right (CodeBlock (Block [Literal "abc  ",Literal "   def()"]))
 
+
+tt = "|A|B|\n|--|---|\n|Paragraph|Text|\n"
+
+-- >>> doParse tableP tt
+-- Right (Table [[Plain (Block [Literal "A"]),Plain (Block [Literal "B"])],[Plain (Block [Literal "Paragraph"]),Plain (Block [Literal "Text"])]])
+  
+tab = Table [
+  [Paragraph (Block [Literal "A"]),Paragraph (Block [Literal "B"])],
+  [Paragraph (Block [Literal "Paragraph"]),Paragraph (Block [Literal "Text"])]]
+
+-- >>> doParse defP ": This is first definition\n: This is second def\n"
+-- Right (Paragraph (Block [Literal "This",Literal " ",Literal "is",Literal " ",Literal "first",Literal " ",Literal "definition"]))
+
+defTest = "First Term\n: This is first definition.\nSecond Term\n: hello world\n: Yes there you go\n"
+
+-- >>> doParse defListP defTest
+-- Right (
+  
+defAns = DefinitionList [
+    DI (Paragraph (Block [Literal "First",Literal " ",Literal "Term"])) [
+      Paragraph (Block [Literal "This",Literal " ",Literal "is",Literal " ",Literal "first",Literal " ",Literal "definition."])
+      ],
+    DI (Paragraph (Block [Literal "Second",Literal " ",Literal "Term"])) [
+      Paragraph (Block [Literal "hello",Literal " ",Literal "world"]),
+      Paragraph (Block [Literal "Yes",Literal " ",Literal "there",Literal " ",Literal "you",Literal " ",Literal "go"])
+      ]
+    ]
+    
 -- >>> runTestTT test_statementP
 -- Counts {cases = 14, tried = 14, errors = 0, failures = 0}
 

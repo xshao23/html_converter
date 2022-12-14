@@ -212,7 +212,11 @@ paragraphP = Paragraph <$> paragraphP'
 
 paragraphP' :: Parser Block
 paragraphP' = do
-  s <- try (someTill statementP (try (some endOfLine *> endOfLine) <|> lookAhead (endOfLine <* wsp <* lookAhead stopP))) <|> some statementP
+  s <- try (
+    someTill statementP (
+      try (some endOfLine *> endOfLine) <|> lookAhead (endOfLine <* wsp <* lookAhead stopP)
+      )
+    ) <|> some statementP
   return (Block s)
 
 plainP :: Parser Component 
@@ -286,28 +290,6 @@ orderedListP' d lastItem itemList = do
             nested <- orderedListP (length ws) currItem []
             orderedListP' (length ws) (lastItem ++ [nested]) itemList
 
--- >>> doParse ulP "- Hello world\n- B\n  - C\n  - D\n    - E\n      - F\n-"
--- Right (UnorderedList [[Plain (Block [Literal "Hello",Literal " ",Literal "world"])],[Plain (Block [Literal "B"]),UnorderedList [[Plain (Block [Literal "C"])],[Plain (Block [Literal "D"]),UnorderedList [[Plain (Block [Literal "E"]),UnorderedList [[Plain (Block [Literal "F"])]]]]]]]])
-
-otmp :: Parser Statement 
-otmp = do 
-  ws <- wsp <* lookAhead digit 
-  s <- try (some digit *> char '.' *> some (char ' ') *> manyTill anyChar (string "\n"))
-  if length ws == 2 
-    then do
-      return $ Literal s
-    else return $ Literal ("length is " ++ show (length ws))
-
-tmp :: Parser Statement 
-tmp = do 
-  ws <- wsp <* lookAhead alphaNum
-  if length ws == 2 
-    then do
-      s <- manyTill alphaNum (string "\n")
-      return $ Literal s
-    else return $ Literal ("length is " ++ show (length ws))
-
-
 tableP :: Parser Component 
 tableP = Table <$> rowsP
 
@@ -330,58 +312,30 @@ cellP :: String -> Component
 cellP s = do 
   case doParse componentP s of 
     Left _ -> Plain (Block [Literal ""])
-    Right c -> c--toPlain c
+    Right c -> c
 
-tt = "|A|B|\n|--|---|\n|Paragraph|Text|\n"
-
-toPlain :: Component -> Component 
-toPlain (Paragraph b) = Plain b 
-toPlain c = c
-
--- >>> doParse tableP tt
--- Right (Table [[Plain (Block [Literal "A"]),Plain (Block [Literal "B"])],[Plain (Block [Literal "Paragraph"]),Plain (Block [Literal "Text"])]])
+defListP :: Parser Component 
+defListP = do 
+  di <- defItemP 
+  try (string "\n")
+  return $ DefinitionList [di]
   
-tab = Table [
-  [Paragraph (Block [Literal "A"]),Paragraph (Block [Literal "B"])],
-  [Paragraph (Block [Literal "Paragraph"]),Paragraph (Block [Literal "Text"])]]
+defItemP :: Parser DefItem 
+defItemP = do
+  term <- manyTill anyChar (lookAhead (string "\n: "))
+  _ <- char '\n' 
+  case doParse componentP term of 
+    Left _ -> return $ DI (Plain (Block [Literal ""])) []
+    Right c -> do 
+      cs <- many defP 
+      return $ DI c cs
 
--- >>> doParse rowP " | abc | def | sd | \n"
-
--- >>> doParse rowsP " | abc | def | sd | \n| g | yj | s | \n"
--- Right [[Paragraph (Block [Literal "abc"]),Paragraph (Block [Literal " ",Literal "def"]),Paragraph (Block [Literal " ",Literal "sd"])],[Paragraph (Block [Literal "g"]),Paragraph (Block [Literal " ",Literal "yj"]),Paragraph (Block [Literal " ",Literal "s"])]]
-
--- >>> cellP " abc hello "
--- Paragraph (Block [Literal " ",Literal "abc",Literal " ",Literal "hello"])
-
-
-test :: Parser Statement 
-test = do 
-  ws <- wsp *> char '|' *> manyTill anyChar (char '\n')-- _ <- string " abc | def | sd | \n"
-
-  return (Literal ws)
-
--- >>> doParse test " | abc | def | sd | \n"
-
-
--- >>> splitOn "|" " abc | def | sd |"
--- [" abc "," def "," sd ",""]
-
--- >>> doParse cellP " Syntax AB  |\n"
--- Right (Paragraph (Block [Literal "Syntax",Literal " ",Literal "AB"]))
-
--- >>> doParse rowP "| abc | def | sd |\n"
--- Left (line 2, column 1):
--- unexpected end of input
--- expecting " " or "|"
-
-rtmp :: Parser Statement 
-rtmp = do 
-  ws <- wsp <* lookAhead (char '|')
-  if length ws == 2 
-    then do
-      s <- manyTill alphaNum (string "\n")
-      return $ Literal s
-    else return $ Literal ("length is " ++ show (length ws))
+defP :: Parser Component
+defP = do 
+  s <- try (string ": " *> manyTill anyChar (string "\n"))
+  case doParse componentP s of 
+    Left _ -> return (Plain (Block [Literal ""]))
+    Right c -> return c
 
 codeblockP :: Parser Component
 codeblockP = do
@@ -410,6 +364,7 @@ componentP = (
   <|> try headingP 
   <|> try listP 
   <|> try tableP
+  <|> try defListP
   <|> try paragraphP
   <|> try plainP
   ) <* optional (many endOfLine)
