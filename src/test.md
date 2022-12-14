@@ -1,6 +1,18 @@
-# Sonnets from the Portuguese  
+# Sonnets from the Portuguese 
 
-## Author
+## Menu
+
+> [Author](#author_heading)
+> [Part I](#part1_heading)
+> [Part VI](#part6_heading)
+> [Part XX](#part20_heading)
+> [Part XXIII](#part23_heading)
+> [Part XXXIII](#part33_heading)
+> [Part XLIII](#part43_heading)
+> [Code Block](#codeblock_heading)
+___________________________________
+
+## Author {#author_heading}
 
 The author is [Elizabeth Barrett Browning](https://en.wikipedia.org/wiki/Elizabeth_Barrett_Browning "A brief Introduction to Browning"), an English poet of the Victorian era.
 
@@ -9,7 +21,7 @@ The author is [Elizabeth Barrett Browning](https://en.wikipedia.org/wiki/Elizabe
 
 ***
 
-## Part I - Paragraph
+## Part I - Paragraph {#part1_heading}
 
 #### First Paragraph
 
@@ -37,7 +49,7 @@ The silver answer rang, -- **`Not Death, but love.`**
 
 ---
 
-## Part VI - Block Quote
+## Part VI - Block Quote {#part6_heading}
 
 #### First Quote 
 
@@ -61,7 +73,7 @@ The silver answer rang, -- **`Not Death, but love.`**
 
 ___
 
-## Part XXXIII - Unordered Lists
+## Part XXXIII - Unordered Lists    {#part33_heading}
 
 - **Yes, call me by my pet-name! let me hear**
 - ~~The name I used to run at, when a child,~~
@@ -79,7 +91,7 @@ ___
                 - With the same heart, will answer, and not wait. 
 ********
 
-## Part XXXIII - Ordered Lists
+## Part XLIII - Ordered Lists     {#part43_heading}
 
 1. **How do I love thee?  Let me count the ways.**
 2. *I love thee to the depth and breadth and height*
@@ -97,7 +109,7 @@ ___
            5.  ==***I shall but love thee better after death.***==
 ---------
 
-## Part XX - Table 
+## Part XX - Table {#part20_heading}
 
 | Column 1 | Column 2 | Column 3 |
 | ---- | ---- | ---- |
@@ -108,7 +120,7 @@ ___
 | No moment at thy voice, but, link by *link*, | Never to feel thee thrill the day or ==night== | **`END`** |
 ________
 
-## Part XXIII - Definition List 
+## Part XXIII - Definition List {#part23_heading}
 
 **Is it indeed so?  If I lay here dead:**
 : ~~Wouldst thou miss any life in losing mine?~~
@@ -121,7 +133,7 @@ ________
 
 ---
 
-## Code Block
+## Code Block {#codeblock_heading}
 
 #### Some Python Code
 
@@ -129,31 +141,31 @@ ________
   import itertools
 
   def twoSum(self, nums, target):
-    for i, n1 in enumerate(nums[ : -1]):
-      for j in range(i + 1, len(nums)):
-        if n1 + nums[j] == target:
-          return [i, j]
+      for i, n1 in enumerate(nums[ : -1]):
+          for j in range(i + 1, len(nums)):
+              if n1 + nums[j] == target:
+                  return [i, j]
 ```
 
 #### Some Java Code 
 
-```
+~~~
   public class LRUCache {
 
     public class Node {
-      private int val;
-      private Node left, right;
+        private int val;
+        private Node left, right;
 
-      public Node(int val) {
-        this.val = val;
-      }
+        public Node(int val) {
+            this.val = val;
+        }
     }
 
     private int capacity;
 
     public LRUCache(int k) {
-      capacity = k;
-      ...
+        capacity = k;
+        ...
     }
 
     public int get(int key) {
@@ -161,11 +173,30 @@ ________
     }
 
     public void put(int key, int value) {
-
+        if (occur.containsKey(key)) {
+            // If `key` already exists, no need to evice anything since
+            // the total number won't change; only need to update its value,
+            // then move the node associated with `key` to the end.
+            Node node = occur.get(key);
+            node.val = value; // Update its value
+            remove(node);
+            addLast(node);
+            
+        } else {
+            // A new `key` is passed, we need to check if we have reached `cap`
+            // If so, need to evict the first (least recently used) node;
+            // otherwise, no eviction is needed and simply add the new pair
+            if (occur.size() == cap) {
+                occur.remove(head.next.key);
+                remove(head.next);
+            }
+            Node newNode = new Node(key, value);
+            occur.put(key, newNode);
+            addLast(newNode);
+        }
     }
-
   }
-```
+~~~
 
 #### Some Haskell Code 
 
@@ -181,3 +212,5 @@ ________
 ```
 
 ______________
+
+

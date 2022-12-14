@@ -148,6 +148,9 @@ titleP = do
           [href, title] -> return (strip href, Just title)
           _ -> return (s, Nothing)
 
+-- >>> doParse linkP "[top of this doc](#sonnets_heading) directly\n"
+-- Right (Link (Block [Literal "top",Literal " ",Literal "of",Literal " ",Literal "this",Literal " ",Literal "doc"]) "#sonnets_heading" Nothing)
+
 linkP :: Parser Statement 
 linkP = do 
   ss <- char '[' *> manyTill statementP (char ']')
@@ -174,17 +177,51 @@ literalP = Literal . strip <$> some (
 headingP :: Parser Component
 headingP = do
   sps <- wsp
-  hLevel <- some (char '#') 
-  guard (length hLevel < 7 && not (null hLevel))
-  ss <- some (char ' ') *> blockP
-  return (Heading (getHeader (length hLevel)) ss Nothing)
-  --return (Plain ss)
+  l <- some (char '#') 
+  guard (length l < 7 && not (null l))
+  s <- wsp *> manyTill anyChar (try endOfLine)
+  let (t, id) = getTextId s in 
+    Heading <$> headingLevelP l <*> headingTextP t <*> return id
 
--- >>> doParse headingP "# **H1 Heading** {#id-3}"
--- Right (Plain (Block [Bold (Block [Literal "H1",Literal " ",Literal "Heading"]),Literal " ",Literal "{#id-3}"]))
+getTextId :: String -> (String, Maybe String)
+getTextId s = case (elemIndex '{' s, elemIndex '#' s, elemIndex '}' s) of 
+  (Just i, Just k, Just j) -> (take i s, Just $ take (j - k - 1) (drop (k + 1) s))
+  (_, _, _) -> (s, Nothing)
+
+headingLevelP :: String -> Parser Header 
+headingLevelP l = return (getHeader (length l))
+
+headingTextP :: String -> Parser Block 
+headingTextP s = case doParse blockP (strip s) of 
+  Left _ -> return $ Block [] 
+  Right b -> return b
+
+-- >>> doParse headingP "## H1 Heading    \n"
+-- Right (Heading h2 (Block [Literal "H1",Literal " ",Literal "Heading"]) Nothing)
+
+-- >>> elemIndex '{' "# H1 Heading {#id-3} \n"
+-- Just 13
+
+-- >>> elemIndex '}' "# H1 Heading {#id-3} \n"
+-- Just 19
+
+-- >>> take 13 "# H1 Heading {#id-3} \n"
+-- "# H1 Heading "
+
+-- >>> drop 13 "# H1 Heading {#id-3} \n"
+-- "{#id-3} \n"
+
+-- >>> take 5 "#id-3} \n"
+-- "#id-3"
+
+-- >>> doParse headingP "# H1 Heading {#id-3} \n"
+-- Right (Plain (Block [Literal "H1 Heading {#id-3} "]))
 
 -- >>> doParse headingP "# **H1 Heading** {#id-3}"
 -- Right (Heading h1 (Block [Bold (Block [Literal "H1",Literal " ",Literal "Heading"]),Literal " ",Literal "{#id-3}"]) Nothing)
+
+-- >>> splitOn "{" "# **H1 Heading** {#id-3}"
+-- ["# **H1 Heading** {#id-3}"]
 
 hidP :: Int -> Block -> Component 
 hidP hl (Block []) = Heading (getHeader hl) (Block []) Nothing
@@ -324,9 +361,13 @@ defP = do
     Left _ -> return (Plain (Block [Literal ""]))
     Right c -> return c
 
-codeblockP :: Parser Component
-codeblockP = do
-  s <- try (string "```\n" *> manyTill anyChar (string "```"))
+
+codeblockP :: Parser Component 
+codeblockP = codeblockP' "```\n" "```" <|> codeblockP' "~~~\n" "~~~"
+
+codeblockP' :: String -> String -> Parser Component
+codeblockP' start end = do
+  s <- try (string start *> manyTill anyChar (string end))
   return $ CodeBlock (Block (map Literal (splitOn "\n" s) ))
 
 hrP :: Parser Component 

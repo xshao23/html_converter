@@ -46,23 +46,6 @@ html2string html = go html "" where
 readAttris :: [(String, String)] -> String 
 readAttris = Prelude.foldr (\(k, v) acc -> " " ++ k ++ "=\"" ++ v++ "\"" ++ acc) ""
 
-t :: [(String, String)]
-t = [("src", "http://"), ("title", "Upenn"), ("alt", "Flowers in Chania")]
-
-boldAndItalic = convStmt $ Bold (Block [
-    Literal "Love is bold", 
-    Italic (Block [Literal " and italic"])
-  ])
-
--- >>> html2string boldAndItalic 
--- "<strong>Love is bold<em> and italic</em></strong>"
-
--- >>> html2string (convCmpt testOrderedList)
--- "<ol><li>first line</li><li>methods: <ul><li><code>getDate()</code></li><li><code>getTime()</code></li><li><code>getMinutes()</code></li></ul></li></ol>"
-
--- >>> readAttris t
--- "src=\"http://\" title=\"Upenn\" alt=\"Flowers in Chania\" "
-
 -- Part 1 : Convert the given Markdown file to an HTML file
 convert :: Markdown -> SimpleHTML String 
 convert (Markdown cs) = render (map convCmpt cs)
@@ -70,8 +53,8 @@ convert (Markdown cs) = render (map convCmpt cs)
 render :: [SimpleHTML String] -> SimpleHTML String 
 render ss = Element "html" [] [Element "body" [] ss]
 
-tableBorder :: Maybe String 
-tableBorder = Just "border-spacing: 40px 0"
+tableBorder :: Maybe String
+tableBorder = Just "border: 1px solid black;"
 
 -- Part 2 : Convert each component of the Markdown to a SimpleHTML
 convCmpt :: Component -> SimpleHTML String
@@ -80,7 +63,9 @@ convCmpt (Paragraph b) = Element "p" [] (convBlock b)
 convCmpt (Blockquote bs) = Element "blockquote" [] (convBlocks bs)
 convCmpt (OrderedList ol) = Element "ol" [] (map convItem ol)
 convCmpt (UnorderedList ul) = Element "ul" [] (map convItem ul)
-convCmpt (Table tr) = Element "table" (addAttris [("style", tableBorder)]) (convRows True tr)
+convCmpt (Table tr) = Element "table" (
+  addAttris [("style", tableBorder)]
+  ) (convRows True tr)
 convCmpt (DefinitionList dl) = Element "dl" [] (concatMap convDefItem dl)
 convCmpt (CodeBlock b) = convBr "code" b
 convCmpt HorizontalRule = Element "hr" [] [] 
@@ -116,15 +101,21 @@ convItem item = Element "li" [] (map convCmpt item)
 
 convRows :: Bool -> [Row] -> [SimpleHTML String]
 convRows _ [] = [] 
-convRows isTitle (r : rs) = Element "tr" [] (
+convRows isTitle (r : rs) = Element "tr" (
+  addAttris [("style", tableBorder)]
+  ) (
   map (if isTitle then convRowTitle else convCol) r
   ) : convRows False rs
 
 convRowTitle :: Component -> SimpleHTML String 
-convRowTitle title = Element "th" [] [convCmpt title]
+convRowTitle title = Element "th" (
+  addAttris [("style", tableBorder)]
+  ) [convCmpt title]
 
 convCol :: Component -> SimpleHTML String 
-convCol col = Element "td" [] [convCmpt col]
+convCol col = Element "td" (
+  addAttris [("style", tableBorder)]
+  ) [convCmpt col]
 
 convDefItem :: DefItem -> [SimpleHTML String]
 convDefItem (DI c cs) = Element "dt" [] [convCmpt c] : getDefs cs
@@ -274,7 +265,7 @@ tTestHeadingID =
       Element "br" [] [], 
       PCDATA "Continues"
       ]
-      
+
 tTestParagraph :: Test
 tTestParagraph = 
   convCmpt (
@@ -378,16 +369,6 @@ expectedUnorderedList = Element "ul" [] [
   ]
   -}
 
-tab = Table [[Plain (Block [Literal "A"]),Plain (Block [Literal "B"])],[Plain (Block [Literal "Paragraph"]),Plain (Block [Literal "Text"])]]
-
--- >>> html2string $ convCmpt tab 
--- "<table><tr><th>A</th><th>B</th></tr><tr><td>Paragraph</td><td>Text</td></tr></table>"
-
-ul = UnorderedList [[Plain (Block [Literal "Hello",Literal " ",Literal "world"])],[Plain (Block [Literal "B"]),UnorderedList [[Plain (Block [Literal "C"])],[Plain (Block [Literal "D"]),UnorderedList [[Plain (Block [Literal "E"]),UnorderedList [[Plain (Block [Literal "F"])]]]]]]]]
-
--- >>> html2string $ convCmpt ul
--- "<ul><li>Hello world</li><li>B<ul><li>C</li><li>D<ul><li>E<ul><li>F</li></ul></li></ul></li></ul></li></ul>"
-
 tTestUnorderedList :: Test 
 tTestUnorderedList = convCmpt testUnorderedList ~?= expectedUnorderedList
 
@@ -411,23 +392,23 @@ testTable = Table [
   ]
 
 expectedTable :: SimpleHTML String 
-expectedTable = Element "table" [("style","border-spacing: 40px 0")] [
-  Element "tr" [] [
-    Element "th" [] [PCDATA "Company"],
-    Element "th" [] [PCDATA "Contact"],
-    Element "th" [] [PCDATA "Country"]
+expectedTable = Element "table" [("style","border: 1px solid black;")] [
+  Element "tr" [("style","border: 1px solid black;")] [
+    Element "th" [("style","border: 1px solid black;")] [PCDATA "Company"],
+    Element "th" [("style","border: 1px solid black;")] [PCDATA "Contact"],
+    Element "th" [("style","border: 1px solid black;")] [PCDATA "Country"]
     ],
 
-  Element "tr" [] [
-    Element "td" [] [PCDATA "Alfreds Futterkiste"],
-    Element "td" [] [PCDATA "Maria Anders"],
-    Element "td" [] [PCDATA "Germany"]
+  Element "tr" [("style","border: 1px solid black;")] [
+    Element "td" [("style","border: 1px solid black;")] [PCDATA "Alfreds Futterkiste"],
+    Element "td" [("style","border: 1px solid black;")] [PCDATA "Maria Anders"],
+    Element "td" [("style","border: 1px solid black;")] [PCDATA "Germany"]
     ],
 
-  Element "tr" [] [
-    Element "td" [] [PCDATA "Centro comercial Moctezuma"],
-    Element "td" [] [PCDATA "Francisco Chang"],
-    Element "td" [] [PCDATA "Mexico"]
+  Element "tr" [("style","border: 1px solid black;")] [
+    Element "td" [("style","border: 1px solid black;")] [PCDATA "Centro comercial Moctezuma"],
+    Element "td" [("style","border: 1px solid black;")] [PCDATA "Francisco Chang"],
+    Element "td" [("style","border: 1px solid black;")] [PCDATA "Mexico"]
     ]
   ]
 
