@@ -1,3 +1,5 @@
+module TestConverter where 
+  
 import Test.HUnit (Test(..), (~?=), (~:), runTestTT)
 import Test.QuickCheck ( quickCheck )
 import HtmlConverter

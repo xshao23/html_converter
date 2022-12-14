@@ -4,25 +4,53 @@
 
 module MarkdownParser where 
 
-import Control.Applicative hiding ((<|>), many, optional)
-import Data.Char (isNumber, isSpace, isAlpha, isAlphaNum)
-import Data.Functor
-import Data.List.Split hiding (oneOf)
-import Data.List
-import Data.String
-import Test.HUnit (Assertion, Counts, Test (..), assert, runTestTT, (~:), (~?=))
-import Test.QuickCheck as QC
-import Data.Set (Set)
+import Control.Applicative
+    ( Applicative(liftA2), Alternative(some) )
 import Control.Monad (guard, when, join)
+import Data.Char (isNumber, isSpace, isAlpha, isAlphaNum)
+import Data.List.Split ( splitOn )
+import Data.List ( elemIndex, isPrefixOf )
+
 import qualified Data.Set as Set (fromList, member)
 
 import qualified System.IO as IO
 import qualified System.IO.Error as IO
-import Debug.Trace
+
 import Text.Parsec.Char
-import Text.ParserCombinators.Parsec hiding (runParser, between, parseFromFile)
-import Text.Parsec.Pos
+    ( anyChar, oneOf, satisfy, endOfLine, string, char, digit )
+import Text.ParserCombinators.Parsec
+    ( optional,
+      parse,
+      anyChar,
+      count,
+      oneOf,
+      choice,
+      lookAhead,
+      satisfy,
+      notFollowedBy,
+      (<|>),
+      string,
+      try,
+      manyTill,
+      char,
+      many,
+      eof,
+      Parser,
+      ParseError,
+      digit )
+import Text.Parsec.Pos ( initialPos )
 import MarkdownSyntax
+    ( Item,
+      getHeader,
+      Header,
+      Statement(..),
+      Block(..),
+      Component(HorizontalRule, Heading, Paragraph, Blockquote,
+                UnorderedList, OrderedList, Table, DefinitionList, Plain,
+                CodeBlock),
+      Markdown(..),
+      DefItem(..),
+      Row )
 import Text.Parsec.Error (newErrorUnknown)
 import Text.Parsec (runParserT)
 
@@ -362,11 +390,11 @@ defP = do
     Right c -> return c
 
 
-codeblockP :: Parser Component 
-codeblockP = codeblockP' "```\n" "```" <|> codeblockP' "~~~\n" "~~~"
+codeBlockP :: Parser Component 
+codeBlockP = codeBlockP' "```\n" "```" <|> codeBlockP' "~~~\n" "~~~"
 
-codeblockP' :: String -> String -> Parser Component
-codeblockP' start end = do
+codeBlockP' :: String -> String -> Parser Component
+codeBlockP' start end = do
   s <- try (string start *> manyTill anyChar (string end))
   return $ CodeBlock (Block (map Literal (splitOn "\n" s) ))
 
@@ -382,7 +410,7 @@ hrP' c = do
 componentP :: Parser Component
 componentP = (
   try hrP 
-  <|> try codeblockP
+  <|> try codeBlockP
   <|> try blockquoteP
   <|> try headingP 
   <|> try listP 

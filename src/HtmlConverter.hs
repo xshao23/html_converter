@@ -1,7 +1,7 @@
 {-# LANGUAGE DeriveFoldable #-}
 module HtmlConverter where 
 
-import Data.Maybe as Maybe
+import Data.Maybe as Maybe ( isJust, fromJust )
 import Data.Semigroup ( Endo(Endo, appEndo) )
 import Test.HUnit (Test(..), (~?=), (~:), runTestTT)
 import Test.QuickCheck
@@ -17,6 +17,14 @@ import qualified Data.Foldable as Foldable
 import qualified Test.QuickCheck as QC
 
 import MarkdownSyntax
+    ( Item,
+      Header(H5, H4, H1, H3),
+      Statement(..),
+      Block(..),
+      Component(..),
+      Markdown(..),
+      DefItem(..),
+      Row )
 import qualified GHC.Generics as Maybe
 
 data SimpleHTML a
@@ -25,8 +33,8 @@ data SimpleHTML a
   | Element a [(a, a)] [SimpleHTML a] -- Element ElementName Attri [..]
   deriving (Eq, Show, Foldable)
 
-convertMarkdownContent :: Markdown -> String 
-convertMarkdownContent = html2string . convert 
+toHtmlStr :: Markdown -> String 
+toHtmlStr = html2string . toHtml
 
 error :: String 
 error = html2string (render [PCDATA "Error Parsing the File"])
@@ -46,9 +54,9 @@ html2string html = go html "" where
 readAttris :: [(String, String)] -> String 
 readAttris = Prelude.foldr (\(k, v) acc -> " " ++ k ++ "=\"" ++ v++ "\"" ++ acc) ""
 
--- Part 1 : Convert the given Markdown file to an HTML file
-convert :: Markdown -> SimpleHTML String 
-convert (Markdown cs) = render (map convCmpt cs)
+-- Part 1 : Convert the given Markdown file to an HTML string
+toHtml :: Markdown -> SimpleHTML String 
+toHtml (Markdown cs) = render (map convCmpt cs)
 
 render :: [SimpleHTML String] -> SimpleHTML String 
 render ss = Element "html" [] [Element "body" [] ss]
@@ -536,7 +544,7 @@ expected1 = render [
   -- "<hr/>",
   -- "<ul><li>hello, world!</li> <li>unordered <ol><li>first line</li><li>second line</li></ol></li></ul>"
 tTest1 :: Test 
-tTest1 = convert test1 ~?= expected1
+tTest1 = toHtml test1 ~?= expected1
 
 test2 :: Markdown 
 test2 = Markdown [
@@ -569,7 +577,7 @@ expected2 =
   ]
 
 tTest2 :: Test 
-tTest2 = convert test2 ~?= expected2
+tTest2 = toHtml test2 ~?= expected2
 
 test3 :: Markdown 
 test3 = Markdown [
@@ -580,7 +588,7 @@ expected3 :: SimpleHTML String
 expected3 = render [Element "h5" [] [PCDATA  "H5 Heading"], Element "code" [] [PCDATA "getDate()"]]
 
 tTest3 :: Test 
-tTest3 = convert test3 ~?= expected3
+tTest3 = toHtml test3 ~?= expected3
 
 -- Below are some operations for property (HTML structure) tests
 empty :: SimpleHTML String 

@@ -1,6 +1,10 @@
 module Main where
 
-import Lib
+import IOHandler ( convert)
+import Tests ( run )
 
 main :: IO ()
-main = putStrLn someFunc
+main = convert
+
+runAllTests :: IO ()
+runAllTests = run

@@ -3,34 +3,82 @@
 
 module TestParser where
 
-
--- import Lib (Parser (...), MarkdownSyntax)
--- import Cosntrol.Applicative
-import Control.Applicative
-import Data.Char (isNumber)
-import Data.Char qualified as Char
-import Data.Char qualified as P
-import MarkdownParser
-import MarkdownSyntax
 import Test.HUnit (Assertion, Counts, Test (..), assert, runTestTT, (~:), (~?=))
+
 import Test.QuickCheck qualified as QC
-import HtmlConverter (tTestHighlight, t, tTestBacktick, tTestLineBreak)
+
+import MarkdownParser
+    ( literalP,
+      lineBreakP,
+      linkP,
+      imageP,
+      backtickP,
+      emojiP,
+      supP,
+      subP,
+      highlightP,
+      strikethroughP,
+      italicP,
+      boldP,
+      doParse )
+      
+import MarkdownSyntax
+    ( Statement(Literal, Bold, Italic, Strikethrough, Highlight, Sub,
+                Sup, Backtick, Emoji, Link, Image, LineBreak),
+      Block(Block),
+      Component(Paragraph, Table, DefinitionList),
+      DefItem(DI) )
+import HtmlConverter 
+    (
+      tTestHighlight, 
+      tTestBacktick, 
+      tTestLineBreak, 
+      tTestHorinzontalRule, 
+      tTestBlockquote, 
+      tTestTable )
 
 -- test cases for Parser 
 test_componentP :: Test
 test_componentP =
   TestList
-    [ doParse headingP "# H1 Heading"  ~?= Right (Heading H1 (Block [Literal "H1", Literal " ", Literal "Heading"]) Nothing),
-      doParse paragraphP "Hello world."  ~?= Right (Paragraph (Block [Literal "Hello", Literal " ", Literal "world."]))
-      --doParse blockquoteP ">I love CIS552>\n>It's the best course!"  ~?= Right (Blockquote [Plain (Literal "I love CIS552"), Newline, Plain (Literal "It's the best course!")]),
-      --doParse orderedListP "1. A\n2. B" ~?= Right (OrderedList [[Plain (Literal "first line")], [Plain (Literal "second line")]]),
-      --doParse unorderedListP "- A\n- B" ~?= Right (UnorderedList [[Plain (Literal "first line")], [Plain (Literal "second line")]])
-      --doParse codeBlockP "`getDate()`" ~?= Right (CodeBlock "getDate()") 
+    [ 
+      tTestHeadingP,
+      tTestParagraphP,
+      tTestBlockquoteP,
+      tTestUnorderedListP,
+      tTestOrderedListP,
+      tTestTableP,
+      tTestDefinitionListP,
+      tTestCodeBlockP,
+      tTestHorinzontalRuleP
       ]
 
+tTestHeadingP :: Test 
+tTestHeadingP = undefined
 
--- >>> doParse emojiP ":joy:"
--- Right (Emoji "U+1F603")
+tTestParagraphP :: Test 
+tTestParagraphP = undefined
+
+tTestBlockquoteP :: Test 
+tTestBlockquoteP = undefined
+
+tTestUnorderedListP :: Test 
+tTestUnorderedListP = undefined 
+
+tTestOrderedListP :: Test 
+tTestOrderedListP = undefined
+
+tTestTableP :: Test 
+tTestTableP = undefined
+
+tTestDefinitionListP :: Test 
+tTestDefinitionListP = undefined
+
+tTestCodeBlockP :: Test 
+tTestCodeBlockP = undefined
+
+tTestHorinzontalRuleP :: Test 
+tTestHorinzontalRuleP = undefined
 
 -- >>> doParse paragraphP "Hello world."
 -- Right (Paragraph (Block [Literal "Hello",Literal " ",Literal "world."]))
@@ -107,7 +155,6 @@ test_statementP =
       tTestImageTitleP,
       tTestLineBreak,
       tTestLiteralP
-      
     ]
 
 tTestBoldP :: Test 
@@ -165,3 +212,9 @@ tTestLineBreakP = doParse lineBreakP "  \na" ~?= Right LineBreak
 
 tTestLiteralP :: Test 
 tTestLiteralP = doParse literalP "hello" ~?= Right (Literal "hello")
+
+runTests :: IO ()
+runTests = do 
+  _ <- runTestTT test_statementP
+  _ <- runTestTT test_componentP
+  return ()

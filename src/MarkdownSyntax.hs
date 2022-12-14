@@ -1,17 +1,12 @@
 module MarkdownSyntax where 
 
-import Data.List 
 import qualified Data.Char as Char
-import Data.Char
-import qualified Data.Set as Set (fromList, member)
-import Test.HUnit
 import Test.QuickCheck (Arbitrary (..), Gen)
 import qualified Test.QuickCheck as QC
 
 newtype Markdown = Markdown [Component]
   deriving (Eq, Show)
 
--- TODO: Only Footnote left
 -- See https://www.markdownguide.org/basic-syntax
 data Component
   = Heading Header Block (Maybe String)
