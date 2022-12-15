@@ -328,7 +328,7 @@ orderedListP d lastItem itemList = OrderedList <$> orderedListP' d lastItem item
 
 orderedListP' :: Int -> Item -> [Item] -> Parser [Item]
 orderedListP' d lastItem itemList = do 
-  ws <- wsp <* lookAhead (digit <|> oneOf "-*+")
+  ws <- wsp <* lookAhead (digit <|> oneOf "\n")
   if length ws < d -- base case 
     then return (itemList ++ [lastItem])
     else do

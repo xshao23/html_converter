@@ -89,6 +89,14 @@ ___
               - And catch the early love up in the late!
                 - Yes, call me by that name,—and I, in truth,
                 - With the same heart, will answer, and not wait. 
+
+
+- ~~Be heir to those who are now ==e^x^animat~e~==:~~
+  - ~~Gather the ==*north flowers to complete the south*==,~~
+    - ~~And catch the early love up in the late!~~
+      - ~~Yes, call me by that name,—and I, in truth,~~
+        - ~~With the same heart, will answer, and not wait***==.~~ 
+
 ********
 
 ## Part XLIII - Ordered Lists     {#part43_heading}
@@ -107,6 +115,14 @@ ___
            3.  With my lost saints,—I love thee with the breath,
            4.  Smiles, tears, of all my life!—and, if God choose,
            5.  ==***I shall but love thee better after death.***==
+
+
+5.  ~~**In my old griefs, and with my childhood’s faith.**~~
+  1.  ~~*I love thee with a love I seemed to lose*~~
+    1.  ~~*With my lost saints,—I love thee with the breath,*~~
+      1.  ~~Smiles, tears, of all my life!—and, if God choose,~~
+        1.  ~~==***I shall but love thee better after death.***==~~
+
 ---------
 
 ## Part XX - Table {#part20_heading}
