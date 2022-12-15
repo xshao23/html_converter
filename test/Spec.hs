@@ -1,5 +1,3 @@
-module Spec where 
-
 import TestConverter ( runTests )
 import TestParser ( runTests )
 
