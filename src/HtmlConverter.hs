@@ -473,23 +473,6 @@ expectedDefinitionList = Element "dl" [] [
 tTestDefinitionList :: Test 
 tTestDefinitionList = convCmpt testDefinitionList ~?= expectedDefinitionList 
 
-defAns = DefinitionList [
-    DI (Paragraph (Block [Literal "First",Literal " ",Literal "Term"])) [
-      Paragraph (Block [Literal "This",Literal " ",Literal "is",Literal " ",Literal "first",Literal " ",Literal "definition."])
-      ],
-    DI (Paragraph (Block [Literal "Second",Literal " ",Literal "Term"])) [
-      Paragraph (Block [Literal "hello",Literal " ",Literal "world"]),
-      Paragraph (Block [Literal "Yes",Literal " ",Literal "there",Literal " ",Literal "you",Literal " ",Literal "go"])
-      ]
-    ]
-
--- >>> convCmpt defAns
--- Element "dl" [] [Element "dt" [] [Element "p" [] [PCDATA "First",PCDATA " ",PCDATA "Term"]],Element "dd" [] [Element "p" [] [PCDATA "This",PCDATA " ",PCDATA "is",PCDATA " ",PCDATA "first",PCDATA " ",PCDATA "definition."]],Element "dt" [] [Element "p" [] [PCDATA "Second",PCDATA " ",PCDATA "Term"]],Element "dd" [] [Element "p" [] [PCDATA "hello",PCDATA " ",PCDATA "world"]],Element "dd" [] [Element "p" [] [PCDATA "Yes",PCDATA " ",PCDATA "there",PCDATA " ",PCDATA "you",PCDATA " ",PCDATA "go"]]]
-
--- >>> html2string $ convCmpt defAns
--- "<dl><dt><p>First Term</p></dt><dd><p>This is first definition.</p></dd><dt><p>Second Term</p></dt><dd><p>hello world</p></dd><dd><p>Yes there you go</p></dd></dl>"
-
-
 tTestCodeBlock :: Test
 tTestCodeBlock = 
   convCmpt (CodeBlock (Block [Literal "def()"])) ~?= 
