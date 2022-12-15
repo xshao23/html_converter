@@ -4,7 +4,8 @@
 | ----- | ------- |
 | Xuchong Shao | xuchong |
 | Yiwen Zhu | yiwzhu |
-​
+
+
 Our project is to take a Markdown input file, convert it and output to an HTML file. We support all the basic syntaxes that are commonly seen in Markdown files, as well as all of the extended syntaxes apart from footnote and automatic URL linking.
 ​
 
@@ -34,7 +35,7 @@ This project compiles with `stack build`.
 You can run the main executable with `stack run`. Specifically, you should pass two arguments (source_file) (output_path), e.g., 
 
 ```
-  stack run markdownInput.md htmlOutput.html
+    stack run markdownInput.md htmlOutput.html
 ```
 
 You can run the tests with `stack test`. 
