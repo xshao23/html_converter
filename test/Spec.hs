@@ -1,10 +1,10 @@
-module Tests where 
+module Spec where 
 
 import TestConverter ( runTests )
 import TestParser ( runTests )
 
-run :: IO ()
-run = do 
+main :: IO ()
+main = do 
     putStrLn "============ Testing Converter ============="
     _ <- TestConverter.runTests
     putStrLn "============== Testing Parser =============="

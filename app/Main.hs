@@ -1,10 +1,6 @@
 module Main where
 
-import IOHandler ( convert)
-import Tests ( run )
+import Lib
 
 main :: IO ()
-main = convert
-
-runAllTests :: IO ()
-runAllTests = run
+main = runConverter

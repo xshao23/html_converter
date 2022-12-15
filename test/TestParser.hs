@@ -6,22 +6,38 @@ module TestParser where
 import Data.Either (isLeft)
 import Test.HUnit (Assertion, Counts, Test (..), assert, runTestTT, (~:), (~?=))
 
-import Test.QuickCheck qualified as QC
-
 import MarkdownParser
+    ( doParse,
+      boldP,
+      italicP,
+      strikethroughP,
+      highlightP,
+      subP,
+      supP,
+      backtickP,
+      emojiP,
+      linkP,
+      imageP,
+      lineBreakP,
+      literalP,
+      headingP,
+      paragraphP,
+      blockquoteP,
+      ulP,
+      olP,
+      tableP,
+      defListP,
+      codeBlockP,
+      hrP )
       
 import MarkdownSyntax
-
-import HtmlConverter
-    (
-      tTestHighlight,
-      tTestBacktick,
-      tTestLineBreak,
-      tTestHorinzontalRule,
-      tTestBlockquote,
-      tTestTable, expectedOrderedList )
-
--- test cases for Parser 
+    ( Block(Block),
+      Statement(Literal, Bold, Italic, Strikethrough, Highlight, Sub,
+                Sup, Backtick, Emoji, Link, Image, LineBreak),
+      Header(H1, H2, H4),
+      DefItem(DI),
+      Component(Heading, Blockquote, UnorderedList, HorizontalRule,
+                OrderedList, Table, DefinitionList, Paragraph, CodeBlock) )
 
 -- >>> runTestTT test_componentP
 -- Counts {cases = 21, tried = 21, errors = 0, failures = 0}
@@ -166,7 +182,7 @@ test_statementP =
       tTestLinkTitleP,
       tTestImageP,
       tTestImageTitleP,
-      tTestLineBreak,
+      tTestLineBreakP,
       tTestLiteralP
     ]
 
