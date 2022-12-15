@@ -89,9 +89,9 @@ tTestBlockquoteP =
 
 tTestUnorderedListP :: Test 
 tTestUnorderedListP = "parsing unordered list" ~: TestList [
-  doParse ulP "- A\n- B\n  - C\n  - D\n***" ~?= Right expectedUnorderedListP,
+  doParse ulP "- A\n- B\n  - C\n  - D\n\n" ~?= Right expectedUnorderedListP,
   doParse ulP "* A\n* B\n  * C\n  * D\n***" ~?= Right expectedUnorderedListP,
-  doParse ulP"+ A\n+ B\n  + C\n  + D\n***" ~?= Right expectedUnorderedListP,
+  doParse ulP"+ A\n+ B\n  + C\n  + D\n\n" ~?= Right expectedUnorderedListP,
   isLeft (doParse ulP "# A\n+ B\n  + C\n  + D\n***") ~?= True
   ]
   where 
@@ -106,8 +106,8 @@ tTestUnorderedListP = "parsing unordered list" ~: TestList [
 
 tTestOrderedListP :: Test 
 tTestOrderedListP = "parsing ordered list" ~: TestList [
-  doParse olP "1. A\n2. B\n  1. C\n  2. D\n***" ~?= Right expectedOrderedListP,
-  isLeft (doParse olP "-. A\n2. B\n  1. C\n  2. D\n***") ~?= True
+  doParse olP "1. A\n2. B\n  1. C\n  2. D\n\n" ~?= Right expectedOrderedListP,
+  isLeft (doParse olP "-. A\n2. B\n  1. C\n  2. D\n\n") ~?= True
   ]
   where 
     expectedOrderedListP :: Component 
