@@ -92,7 +92,7 @@ statementP = notFollowedBy (endOfLine *> wsp *> endOfLine) *> choice [
   ]
 
 doParse :: Parser a -> String -> Either ParseError a
-doParse p = parse p ""
+doParse p = parse p "No parses"
 
 lstrip :: String -> String
 lstrip [] = []
@@ -385,7 +385,7 @@ defItemP = do
 defP :: Parser Component
 defP = do 
   s <- try (string ": " *> manyTill anyChar (string "\n"))
-  case doParse componentP s of 
+  case doParse componentP (strip s) of 
     Left _ -> return (Plain (Block [Literal ""]))
     Right c -> return c
 

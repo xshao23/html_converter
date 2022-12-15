@@ -33,8 +33,6 @@ import HtmlConverter
       prop_InsertStmt,
       prop_FindPostPresentStmt,
       prop_FindPostPresentCmpt,
-      prop_FindPostAbsentStmt,
-      prop_FindPostAbsentCmpt,
       prop_InsertCmpt,
       prop_InsertEmptyStmt,
       prop_InsertEmptyCmpt,
@@ -91,8 +89,11 @@ tMarkdownTest = "Markdown test" ~: TestList [
 
 runTests :: IO ()
 runTests = do 
+  putStrLn "Test converting statements"
   _ <- runTestTT tStmtTest 
+  putStrLn "Test converting components"
   _ <- runTestTT tCmptTest 
+  putStrLn "Test converting markdown input"
   _ <- runTestTT tMarkdownTest
 
   putStrLn "quickCheck prop_FindPostPresentStmt"
@@ -100,12 +101,6 @@ runTests = do
 
   putStrLn "quickCheck prop_FindPostPresentCmpt"
   quickCheck prop_FindPostPresentCmpt
-
-  putStrLn "quickCheck prop_FindPostAbsentStmt"
-  quickCheck prop_FindPostAbsentStmt
-
-  putStrLn "quickCheck prop_FindPostAbsentCmpt"
-  quickCheck prop_FindPostAbsentCmpt
 
   putStrLn "quickCheck prop_InsertEmptyStmt"
   quickCheck prop_InsertEmptyStmt

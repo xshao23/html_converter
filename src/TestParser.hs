@@ -3,41 +3,29 @@
 
 module TestParser where
 
+import Data.Either (isLeft)
 import Test.HUnit (Assertion, Counts, Test (..), assert, runTestTT, (~:), (~?=))
 
 import Test.QuickCheck qualified as QC
 
 import MarkdownParser
-    ( literalP,
-      lineBreakP,
-      linkP,
-      imageP,
-      backtickP,
-      emojiP,
-      supP,
-      subP,
-      highlightP,
-      strikethroughP,
-      italicP,
-      boldP,
-      doParse )
       
 import MarkdownSyntax
-    ( Statement(Literal, Bold, Italic, Strikethrough, Highlight, Sub,
-                Sup, Backtick, Emoji, Link, Image, LineBreak),
-      Block(Block),
-      Component(Paragraph, Table, DefinitionList),
-      DefItem(DI) )
-import HtmlConverter 
+
+import HtmlConverter
     (
-      tTestHighlight, 
-      tTestBacktick, 
-      tTestLineBreak, 
-      tTestHorinzontalRule, 
-      tTestBlockquote, 
-      tTestTable )
+      tTestHighlight,
+      tTestBacktick,
+      tTestLineBreak,
+      tTestHorinzontalRule,
+      tTestBlockquote,
+      tTestTable, expectedOrderedList )
 
 -- test cases for Parser 
+
+-- >>> runTestTT test_componentP
+-- Counts {cases = 21, tried = 21, errors = 0, failures = 0}
+
 test_componentP :: Test
 test_componentP =
   TestList
@@ -54,85 +42,110 @@ test_componentP =
       ]
 
 tTestHeadingP :: Test 
-tTestHeadingP = undefined
+tTestHeadingP = "parsing headings" ~: TestList [
+   doParse headingP "## Heading level2  \n" ~?= Right (
+    Heading H2 (
+      Block [Literal "Heading", Literal " ", Literal "level2"]
+      ) Nothing),
+    doParse headingP "#### Sonnets {#id-1}  \n" ~?= Right (
+      Heading H4 (Block [Literal "Sonnets"]) (Just "id-1")
+    ),
+    doParse headingP "#H1 {id2}\n" ~?= Right (
+      Heading H1 (Block [Literal "H1", Literal " ", Literal "{id2}"]) Nothing
+    ),
+    isLeft (doParse headingP ">H1\n") ~?= True
+  ]
 
 tTestParagraphP :: Test 
-tTestParagraphP = undefined
+tTestParagraphP = 
+  doParse paragraphP "Hello world." ~?= Right (
+    Paragraph (Block [Literal "Hello",Literal " ",Literal "world."])
+    )
 
 tTestBlockquoteP :: Test 
-tTestBlockquoteP = undefined
+tTestBlockquoteP = 
+  doParse blockquoteP "> ***This is love***\n> ~~Yep, it is~~ \n" ~?=
+    Right (
+      Blockquote [
+        Block [Bold (Block [Italic (Block [Literal "This",Literal " ",Literal "is",Literal " ",Literal "love"])])],
+        Block [Strikethrough (Block [Literal "Yep,",Literal " ",Literal "it",Literal " ",Literal "is"]),Literal " "]
+      ])
 
 tTestUnorderedListP :: Test 
-tTestUnorderedListP = undefined 
+tTestUnorderedListP = "parsing unordered list" ~: TestList [
+  doParse ulP "- A\n- B\n  - C\n  - D\n***" ~?= Right expectedUnorderedListP,
+  doParse ulP "* A\n* B\n  * C\n  * D\n***" ~?= Right expectedUnorderedListP,
+  doParse ulP"+ A\n+ B\n  + C\n  + D\n***" ~?= Right expectedUnorderedListP,
+  isLeft (doParse ulP "# A\n+ B\n  + C\n  + D\n***") ~?= True
+  ]
+  where 
+    expectedUnorderedListP :: Component 
+    expectedUnorderedListP = UnorderedList [
+        [Paragraph (Block [Literal "A"])],
+        [Paragraph (Block [Literal "B"]), UnorderedList [
+          [Paragraph (Block [Literal "C"])],
+          [Paragraph (Block [Literal "D"])]
+        ]]
+      ]
 
 tTestOrderedListP :: Test 
-tTestOrderedListP = undefined
+tTestOrderedListP = "parsing ordered list" ~: TestList [
+  doParse olP "1. A\n2. B\n  1. C\n  2. D\n***" ~?= Right expectedOrderedListP,
+  isLeft (doParse olP "-. A\n2. B\n  1. C\n  2. D\n***") ~?= True
+  ]
+  where 
+    expectedOrderedListP :: Component 
+    expectedOrderedListP = OrderedList [
+        [Paragraph (Block [Literal "A"])],
+        [Paragraph (Block [Literal "B"]), OrderedList [
+          [Paragraph (Block [Literal "C"])],
+          [Paragraph (Block [Literal "D"])]
+        ]]
+      ]
 
 tTestTableP :: Test 
-tTestTableP = undefined
+tTestTableP = TestList [
+  doParse tableP testTableP ~?= Right expectedTableP,
+  isLeft (doParse tableP "|A|B|") ~?= True
+  ]
+  where 
+    testTableP = "|A|B|\n|--|---|\n|Paragraph|Text|\n"
+    expectedTableP = Table [
+      [Paragraph (Block [Literal "A"]),Paragraph (Block [Literal "B"])],
+      [Paragraph (Block [Literal "Paragraph"]),Paragraph (Block [Literal "Text"])]
+      ]
 
 tTestDefinitionListP :: Test 
-tTestDefinitionListP = undefined
-
-tTestCodeBlockP :: Test 
-tTestCodeBlockP = undefined
-
-tTestHorinzontalRuleP :: Test 
-tTestHorinzontalRuleP = undefined
-
--- >>> doParse paragraphP "Hello world."
--- Right (Paragraph (Block [Literal "Hello",Literal " ",Literal "world."]))
-
-
--- >>> doParse blockP "This is love"
--- Right (Block [Literal "This",Literal " ",Literal "is",Literal " ",Literal "love"])
-
--- >>> doParse blockquoteP' "> This is love\n"
--- Right (Block [Literal "This",Literal " ",Literal "is",Literal " ",Literal "love"])
-
--- >>> doParse blockquoteP "> ***This is love***\n> ~~Yep, it is~~ \n"
--- Right (Blockquote [Block [Bold (Block [Italic (Block [Literal "This",Literal " ",Literal "is",Literal " ",Literal "love"])])],Block [Strikethrough (Block [Literal "Yep,",Literal " ",Literal "it",Literal " ",Literal "is"]),Literal " "]])
-
--- >>> doParse blockquoteP "> **A**\n> B\n"
--- Right (Blockquote [Block [Bold (Block [Literal "A"])],Block [Literal "B"]])
-
-
--- >>> doParse ulP "- Hello world\n- B\n  - C\n  - D\n    - E\n      - F\n-"
--- Right (UnorderedList [[Paragraph (Block [Literal "Hello",Literal " ",Literal "world"])],[Paragraph (Block [Literal "B"]),UnorderedList [[Paragraph (Block [Literal "C"])],[Paragraph (Block [Literal "D"]),UnorderedList [[Paragraph (Block [Literal "E"]),UnorderedList [[Paragraph (Block [Literal "F"])]]]]]]]])
-
--- >>> doParse (orderedListP 0 [] []) "1. Hello world\n2. B\n  3. C\n  4. D\n    5. E\n      6. F\n***"
-
-
--- >>> doParse codeblockP "```\nabc  \n   def()```"
--- Right (CodeBlock (Block [Literal "abc  ",Literal "   def()"]))
-
-
-tt = "|A|B|\n|--|---|\n|Paragraph|Text|\n"
-
--- >>> doParse tableP tt
--- Right (Table [[Plain (Block [Literal "A"]),Plain (Block [Literal "B"])],[Plain (Block [Literal "Paragraph"]),Plain (Block [Literal "Text"])]])
-  
-tab = Table [
-  [Paragraph (Block [Literal "A"]),Paragraph (Block [Literal "B"])],
-  [Paragraph (Block [Literal "Paragraph"]),Paragraph (Block [Literal "Text"])]]
-
--- >>> doParse defP ": This is first definition\n: This is second def\n"
--- Right (Paragraph (Block [Literal "This",Literal " ",Literal "is",Literal " ",Literal "first",Literal " ",Literal "definition"]))
-
-defTest = "First Term\n: This is first definition.\nSecond Term\n: hello world\n: Yes there you go\n"
-
--- >>> doParse defListP defTest
--- Right (
-  
-defAns = DefinitionList [
-    DI (Paragraph (Block [Literal "First",Literal " ",Literal "Term"])) [
-      Paragraph (Block [Literal "This",Literal " ",Literal "is",Literal " ",Literal "first",Literal " ",Literal "definition."])
-      ],
-    DI (Paragraph (Block [Literal "Second",Literal " ",Literal "Term"])) [
-      Paragraph (Block [Literal "hello",Literal " ",Literal "world"]),
-      Paragraph (Block [Literal "Yes",Literal " ",Literal "there",Literal " ",Literal "you",Literal " ",Literal "go"])
+tTestDefinitionListP = doParse defListP "Best PL\n: Haskell \n: Python\n\n" ~?= Right (
+  DefinitionList [
+    DI (Paragraph $ Block [Literal "Best", Literal " ", Literal "PL"]) 
+    [
+      Paragraph $ Block [Literal "Haskell"],
+      Paragraph $ Block [Literal "Python"]
       ]
     ]
+  )
+
+tTestCodeBlockP :: Test 
+tTestCodeBlockP = "parsing code blocks" ~: TestList [
+  doParse codeBlockP "```\nabc  \n   def()```" ~?= Right expectedCodeBlockP, 
+  doParse codeBlockP "~~~\nabc  \n   def()~~~" ~?= Right expectedCodeBlockP,
+  isLeft (doParse codeBlockP "^^^\nabc  \n  def()^^^") ~?= True,
+  isLeft (doParse codeBlockP "```abc  \n  def()^^^") ~?= True
+  ]
+  where 
+    expectedCodeBlockP = CodeBlock (Block [Literal "abc  ",Literal "   def()"])
+  
+tTestHorinzontalRuleP :: Test 
+tTestHorinzontalRuleP = "parsing horizontal rules" ~: TestList [
+  doParse hrP "***\n" ~?= Right HorizontalRule,
+  doParse hrP "---\n" ~?= Right HorizontalRule,
+  doParse hrP "___\n" ~?= Right HorizontalRule,
+  doParse hrP "________     \n" ~?= Right HorizontalRule,
+  isLeft (doParse hrP "__  \n") ~?= True,
+  isLeft (doParse hrP "_ __  \n") ~?= True,
+  isLeft (doParse hrP "+++\n") ~?= True
+  ]
 
 -- >>> runTestTT test_statementP
 -- Counts {cases = 14, tried = 14, errors = 0, failures = 0}
@@ -215,6 +228,8 @@ tTestLiteralP = doParse literalP "hello" ~?= Right (Literal "hello")
 
 runTests :: IO ()
 runTests = do 
+  putStrLn "Test parsing statements"
   _ <- runTestTT test_statementP
+  putStrLn "Test parsing components"
   _ <- runTestTT test_componentP
   return ()

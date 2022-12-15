@@ -628,15 +628,6 @@ prop_FindPostPresentStmt s1 s2 = prop_FindPostPresent (convStmt s1) (convStmt s2
 prop_FindPostPresentCmpt :: Component -> Component -> Property 
 prop_FindPostPresentCmpt c1 c2 = prop_FindPostPresent (convCmpt c1) (convCmpt c2)
 
-prop_FindPostAbsent :: SimpleHTML String -> SimpleHTML String -> Bool
-prop_FindPostAbsent k h = not (member k (delete k h))
-
-prop_FindPostAbsentStmt :: Statement -> Statement -> Bool 
-prop_FindPostAbsentStmt s1 s2 = prop_FindPostAbsent (convStmt s1) (convStmt s2)
-
-prop_FindPostAbsentCmpt :: Component -> Component -> Bool 
-prop_FindPostAbsentCmpt c1 c2 = prop_FindPostAbsent (convCmpt c1) (convCmpt c2)
-
 -- Metamorphic Properties
 prop_InsertEmpty :: SimpleHTML String -> Bool
 prop_InsertEmpty k = 

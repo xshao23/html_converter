@@ -5,6 +5,8 @@ import TestParser ( runTests )
 
 run :: IO ()
 run = do 
-    putStrLn "============== Testing Converter =============="
+    putStrLn "============ Testing Converter ============="
     _ <- TestConverter.runTests
-    putStrLn "===================== End ====================="
+    putStrLn "============== Testing Parser =============="
+    _ <- TestParser.runTests
+    putStrLn "=================== End ===================="
