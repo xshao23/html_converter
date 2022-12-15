@@ -32,7 +32,7 @@ Haskell packages typically divide their source code into three separate places:
 ## Building, running, and testing
 
 This project compiles with `stack build`. 
-You can run the main executable with `stack run`. Specifically, you should pass two arguments (source_file) (output_path), e.g., 
+You can run the main executable with `stack run`. Specifically, you should pass two arguments `source_file` and `output_path`, e.g., 
 
 ```
     stack run markdownInput.md htmlOutput.html
