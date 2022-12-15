@@ -305,7 +305,7 @@ unorderedListP d lastItem itemList = UnorderedList <$> unorderedListP' d lastIte
 
 unorderedListP' :: Int -> Item -> [Item] -> Parser [Item]
 unorderedListP' d lastItem itemList = do 
-  ws <- wsp <* lookAhead (oneOf "-*+")
+  ws <- wsp <* lookAhead (oneOf "-*+\n")
   if length ws < d -- base case 
     then return (itemList ++ [lastItem])
     else do
